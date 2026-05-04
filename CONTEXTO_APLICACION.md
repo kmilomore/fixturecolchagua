@@ -412,14 +412,14 @@ En ese modo, `disciplinaId` deja de ser obligatorio porque el backend lo resuelv
 ### Administración
 
 - `/admin`: acceso admin exclusivo con Google Sign-In y lista blanca de correos.
-- `/admin/resultados`: ingreso de resultados.
-- `/campeonatos/nuevo`: wizard simple de creación, protegido por sesión admin.
+- `/admin/resultados`: ingreso de resultados. **Protegida por `<RequireAdmin>`.**
+- `/campeonatos/nuevo`: wizard simple de creación. **Protegida por `<RequireAdmin>`.**
 
-La ruta `/campeonatos/nuevo` no debe ser pública. Si el usuario no tiene sesión admin activa, se redirige a `/admin`.
+Las rutas `/admin/resultados` y `/campeonatos/nuevo` están envueltas en `<RequireAdmin>` a nivel de router. Si el usuario no tiene sesión admin activa, se redirigen a `/admin`. No eliminar este guard ni mover estas rutas fuera de `<RequireAdmin>`.
 
 ## Archivos Clave del Frontend
 
-- `src/api/gasClient.ts`: cliente tipado hacia GAS.
+- `src/api/gasClient.ts`: cliente tipado hacia GAS. Incluye `fetchWithTimeout` con `AbortController` (15 s) aplicado a todos los GET y POST. Si GAS no responde en ese plazo, la promesa se cancela y TanStack Query recibe el error.
 - `src/types/index.ts`: contratos de datos.
 - `src/components/DisciplineFilter.tsx`: filtros horizontales por disciplina/género/categoría/fase.
 - `src/components/CalendarView.tsx`: calendario mensual.
@@ -488,6 +488,8 @@ Debe usar scroll horizontal en pantallas pequeñas, no apilar botones verticalme
 - Al guardar un resultado desde admin, el usuario recibe confirmación visible y luego se invalidan queries de `partidos` y `tabla` para refrescar datos relacionados.
 - Los guards de rutas admin ya no deben basarse solo en un booleano persistido; la sesión debe considerarse válida solo mientras no expire.
 - La integración con Google Sign-In requiere permitir `https://accounts.google.com` en CSP para scripts y estilos. En Vercel se usa además `style-src-elem` para evitar el bloqueo del stylesheet de GSI.
+- La CSP de `connect-src` no incluye `https://api.open-meteo.com`. El navegador no puede llamar directamente a Open-Meteo; toda la meteorología debe pasar por el proxy serverless `/api/weather`. Si se elimina ese proxy, hay que volver a agregar el origen al CSP antes de reconectar la llamada directa.
+- Todas las rutas del router usan `React.lazy()` + un único `<Suspense>` en la raíz de `App.tsx`. El bundle inicial solo contiene el shell de la app; cada página se descarga al navegar por primera vez. Al agregar una nueva página, importarla con `lazy()`, no con import estático.
 - El frontend publica `Cross-Origin-Opener-Policy: same-origin-allow-popups` para convivir mejor con el flujo popup de Google Identity Services.
 - El warning `Cross-Origin-Opener-Policy policy would block the window.postMessage call` puede seguir apareciendo en consola incluso cuando el login funciona. Si la credencial vuelve y el acceso admin entra, se considera ruido no bloqueante.
 - Si Apps Script responde `GOOGLE_CLIENT_ID no configurado en Script Properties`, el problema está en Script Properties del proyecto GAS, no en variables de entorno de Vercel.
@@ -503,8 +505,11 @@ Debe usar scroll horizontal en pantallas pequeñas, no apilar botones verticalme
 - No borrar `grupo` de `partidos` o `equipos` si se quiere calendario ordenado por grupos.
 - No duplicar filas en `partidos`; usar el importador, que actualiza/salta duplicados.
 - No usar contraseñas locales para admin; el acceso debe resolverse solo con Google Sign-In y validación backend.
-- No volver a dejar `/campeonatos/nuevo` accesible públicamente.
+- No volver a dejar `/campeonatos/nuevo` ni `/admin/resultados` accesibles públicamente; ambas rutas deben permanecer dentro de `<RequireAdmin>` en `App.tsx`.
 - No agregar botones públicos de "Crear campeonato" en home o listado sin validar admin.
+- No importar páginas con import estático en `App.tsx`; usar siempre `React.lazy()` para conservar el code splitting.
+- No llamar directamente a `https://api.open-meteo.com` desde el navegador en producción; canalizar por `/api/weather`. Si se necesita agregar el origen directo de vuelta al CSP, revisar primero si el proxy sigue operativo.
+- No quitar el `fetchWithTimeout` de `gasClient.ts`; sin él, las llamadas a GAS pueden colgar indefinidamente ante una respuesta lenta del backend.
 - No volver a duplicar en móvil accesos que lleven al mismo destino, como `Campeonatos` y `Fixture` apuntando ambos a `/campeonatos`.
 - No usar el query completo de partidos en home o kiosco si el resumen agregado cubre la necesidad.
 - No asumir que hacer una tarjeta más pequeña resuelve por sí solo el desborde en fullscreen; en el kiosco el control real suele ser cantidad visible por bloque.
@@ -538,6 +543,7 @@ Después de cambiar archivos `gas/*.gs`, copiar/actualizar en Apps Script y rede
 - Agregar vista de detalle de partido.
 - Agregar generación automática de grupos desde `import_temp`.
 - Mantener lista blanca de correos admin, expiración razonable de sesión y rotación del cliente OAuth cuando cambie el entorno.
-- Separar chunk del frontend con lazy routes si crece el bundle.
 - Evaluar autorrotación real del modo kiosco por jornada/cancha si se usará en pantallas físicas.
 - Agregar carga/edición visual de semifinales, final y tercer lugar desde admin.
+- Evaluar pausar el polling del kiosco cuando el tab esté en segundo plano usando la Visibility API (`document.visibilitychange`) para reducir llamadas innecesarias a GAS.
+- Confirmar que `Code.gs` valida el token de Google en **todas** las mutaciones admin (no solo en `auth/login`), ya que el frontend solo es la primera línea de defensa.
