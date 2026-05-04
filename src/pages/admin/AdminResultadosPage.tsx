@@ -25,8 +25,10 @@ export function AdminResultadosPage() {
   const [campeonatoId, setCampeonatoId] = useState<string>('')
   const [open, setOpen] = useState(false)
   const [selected, setSelected] = useState<Partido | null>(null)
-  const [ml, setMl] = useState('0')
-  const [mv, setMv] = useState('0')
+  const [ml, setMl] = useState('')
+  const [mv, setMv] = useState('')
+  const [hora, setHora] = useState('')
+  const [lugar, setLugar] = useState('')
   const [feedback, setFeedback] = useState<FeedbackState | null>(null)
 
   const campeonatosQ = useQuery({
@@ -59,7 +61,26 @@ export function AdminResultadosPage() {
     if (active) setCampeonatoId(active.id)
   }, [campeonatosQ.data, campeonatoId])
 
-  const mut = useMutation({
+  const scheduleMut = useMutation({
+    mutationFn: async () => {
+      if (!selected) return
+      return api.partidos.update({
+        id: selected.id,
+        hora,
+        lugar: lugar.trim(),
+      })
+    },
+    onSuccess: async () => {
+      const resumen = selected ? `${selected.localNombre} vs ${selected.visitaNombre}` : 'Partido actualizado.'
+      setFeedback({ tone: 'success', message: `Horario actualizado: ${resumen} · ${hora || '--:--'} · ${lugar.trim() || 'Sin lugar'}` })
+      await qc.invalidateQueries({ queryKey: ['partidos'] })
+    },
+    onError: (error) => {
+      setFeedback({ tone: 'error', message: (error as Error).message })
+    },
+  })
+
+  const resultMut = useMutation({
     mutationFn: async () => {
       if (!selected) return
       return api.partidos.registrarResultado(selected.id, Number(ml), Number(mv))
@@ -100,7 +121,7 @@ export function AdminResultadosPage() {
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="font-display text-3xl font-semibold text-primary">Ingreso de resultados</h1>
-          <p className="text-sm text-muted">Selecciona un campeonato y registra marcadores pendientes con confirmación inmediata.</p>
+          <p className="text-sm text-muted">Selecciona un campeonato y administra hora, lugar y marcadores de los partidos pendientes.</p>
         </div>
         <Button asChild variant="outline">
           <Link to="/admin">Volver</Link>
@@ -211,8 +232,10 @@ export function AdminResultadosPage() {
               onClick={(pp) => {
                 setFeedback(null)
                 setSelected(pp)
-                setMl('0')
-                setMv('0')
+                setMl(pp.marcadorLocal === '' ? '' : String(pp.marcadorLocal))
+                setMv(pp.marcadorVisita === '' ? '' : String(pp.marcadorVisita))
+                setHora(String(pp.hora || ''))
+                setLugar(String(pp.lugar || ''))
                 setOpen(true)
               }}
             />
@@ -223,16 +246,28 @@ export function AdminResultadosPage() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Registrar resultado</DialogTitle>
+            <DialogTitle>Gestionar partido</DialogTitle>
             <DialogDescription>
               {selected ? `${selected.localNombre} vs ${selected.visitaNombre}` : ''}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-3 md:grid-cols-2">
             <div className="space-y-2">
-              <Label>Local</Label>
+              <Label htmlFor="hora">Hora</Label>
+              <Input id="hora" type="time" value={hora} onChange={(e) => setHora(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="lugar">Lugar</Label>
+              <Input id="lugar" value={lugar} onChange={(e) => setLugar(e.target.value)} placeholder="Ej. Gimnasio Techado" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 border-t border-primary/10 pt-4">
+            <div className="space-y-2">
+              <Label htmlFor="marcador-local">Local</Label>
               <Input
+                id="marcador-local"
                 inputMode="numeric"
                 className="font-score text-3xl font-bold tabular-nums"
                 value={ml}
@@ -240,8 +275,9 @@ export function AdminResultadosPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Visita</Label>
+              <Label htmlFor="marcador-visita">Visita</Label>
               <Input
+                id="marcador-visita"
                 inputMode="numeric"
                 className="font-score text-3xl font-bold tabular-nums"
                 value={mv}
@@ -250,18 +286,27 @@ export function AdminResultadosPage() {
             </div>
           </div>
 
-          {mut.isPending ? <p className="text-sm text-muted">Guardando resultado y recalculando tabla...</p> : null}
+          {scheduleMut.isPending ? <p className="text-sm text-muted">Guardando hora y lugar del partido...</p> : null}
+          {resultMut.isPending ? <p className="text-sm text-muted">Guardando resultado y recalculando tabla...</p> : null}
 
           <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={mut.isPending}>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={scheduleMut.isPending || resultMut.isPending}>
               Cancelar
             </Button>
             <Button
               type="button"
-              onClick={() => mut.mutate()}
-              disabled={mut.isPending || !selected || ml === '' || mv === '' || Number.isNaN(Number(ml)) || Number.isNaN(Number(mv))}
+              variant="outline"
+              onClick={() => scheduleMut.mutate()}
+              disabled={scheduleMut.isPending || resultMut.isPending || !selected || !hora.trim() || !lugar.trim()}
             >
-              {mut.isPending ? 'Guardando...' : 'Guardar'}
+              {scheduleMut.isPending ? 'Guardando...' : 'Guardar hora y lugar'}
+            </Button>
+            <Button
+              type="button"
+              onClick={() => resultMut.mutate()}
+              disabled={scheduleMut.isPending || resultMut.isPending || !selected || ml === '' || mv === '' || Number.isNaN(Number(ml)) || Number.isNaN(Number(mv))}
+            >
+              {resultMut.isPending ? 'Guardando...' : 'Guardar resultado'}
             </Button>
           </div>
         </DialogContent>

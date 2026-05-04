@@ -56,8 +56,15 @@ export function KioscoPage() {
   if (!hasGasUrl) return <p className="p-6 text-muted">Configura VITE_GAS_URL.</p>
 
   return (
-    <div className="min-h-dvh bg-[image:var(--gradient-brand)] p-4 text-white md:p-8">
-      <div className="mx-auto max-w-7xl space-y-6">
+    <div className="relative min-h-dvh overflow-hidden bg-slate-950 text-white">
+      <div
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: "url('/auth.webp')" }}
+        aria-hidden
+      />
+      <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(11,18,43,0.88),rgba(37,48,107,0.78),rgba(0,107,185,0.48))]" aria-hidden />
+
+      <div className="relative mx-auto max-w-7xl space-y-6 p-4 md:p-8">
         <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-4">
             <div className="grid h-20 w-20 place-items-center rounded-2xl bg-white p-3 shadow-lg">

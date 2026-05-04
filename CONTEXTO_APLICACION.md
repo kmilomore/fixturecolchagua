@@ -2,7 +2,7 @@
 
 ## Objetivo
 
-La aplicación gestiona y publica el fixture del **Campeonato Deportivo SLEP Colchagua 2026**. Su foco actual es mostrar de forma pública partidos, calendario, grupos y tablas para la disciplina **VOLEIBOL**, usando Google Sheets como fuente de datos y Google Apps Script como API.
+La aplicación gestiona y publica el fixture del **Campeonato Deportivo SLEP Colchagua 2026**. Su foco actual es mostrar de forma pública partidos, calendario, grupos y tablas para **múltiples disciplinas** dentro de un mismo campeonato, usando Google Sheets como fuente de datos y Google Apps Script como API.
 
 El objetivo del MVP es:
 
@@ -11,6 +11,7 @@ El objetivo del MVP es:
 - Mostrar partidos por campeonato, disciplina, género, categoría y fase.
 - Administrar resultados desde un panel básico.
 - Exponer resúmenes optimizados para home y modo kiosco sin descargar todo el fixture en esas vistas.
+- Mantener contexto claro de disciplina en vistas públicas cuando un campeonato agrupa varios deportes.
 - Mantener el sistema extensible para más disciplinas y campeonatos.
 - Mantener el sitio como espacio público: solo usuarios admin pueden crear campeonatos.
 
@@ -67,6 +68,9 @@ FIXTURE 2.0/
 - Estados vacíos y errores más útiles en `Mis partidos` y `Admin resultados`.
 - Feedback transaccional visible al guardar resultados y recálculo de tablas.
 - Saneamiento básico de strings provenientes de Google Sheets antes de exponerlos al frontend.
+- Persistencia del filtro de disciplina, género, categoría y fase al navegar entre Resumen, Calendario, Grupos, Fases y Partidos dentro de un campeonato.
+- Refuerzo visual de la disciplina activa en el módulo de campeonato: tabs con mayor contraste, bloque de filtro con disciplina seleccionada y badge visible en el banner.
+- Visibilidad explícita de la disciplina en los resúmenes públicos: `Próximo partido` de la home y tarjetas de `KioscoPage` para siguiente partido, partidos de hoy y próximos encuentros.
 
 ## Identidad Visual
 
@@ -254,6 +258,18 @@ Uso recomendado:
 - `HomePage`: próximo partido y partidos de hoy del campeonato activo.
 - `KioscoPage`: siguiente partido, partidos de hoy y próximos encuentros con polling cada 60 segundos.
 - No usar `vista=resumen` en vistas operativas que necesiten el fixture completo.
+
+Consideraciones de UX ya implementadas para `vista=resumen`:
+
+- Los bloques públicos que consumen este resumen deben mostrar la disciplina del partido cuando el campeonato tenga más de un deporte.
+- `HomePage` expone la disciplina en el card de `Próximo partido`.
+- `KioscoPage` expone la disciplina en `Próximo partido`, `Partidos de hoy` y `Próximos encuentros`.
+
+Consideraciones de UX ya implementadas para navegación por campeonato:
+
+- El filtro se persiste en query params mediante `disciplinaId`, `genero`, `categoria` y `fase`.
+- La navegación interna del campeonato debe conservar esos query params para no perder el contexto al cambiar de vista.
+- El banner del campeonato y el bloque del filtro deben dejar visible la disciplina actualmente seleccionada.
 
 ### POST
 

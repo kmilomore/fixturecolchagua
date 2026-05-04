@@ -138,6 +138,8 @@ export const api = {
       }),
     create: (payload: Record<string, unknown>) =>
       post({ resource: 'partidos', action: 'create', payload }),
+    update: (payload: { id: string; hora?: string; lugar?: string }) =>
+      post({ resource: 'partidos', action: 'update', payload }),
     registrarResultado: (id: string, marcadorLocal: number, marcadorVisita: number) =>
       post({
         resource: 'partidos',
