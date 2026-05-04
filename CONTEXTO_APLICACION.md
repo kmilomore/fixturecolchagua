@@ -60,6 +60,13 @@ FIXTURE 2.0/
 - Base de datos: Google Sheets.
 - Deploy frontend: Vercel.
 
+## Documentación por Módulo
+
+Además de este contexto general, existen documentos específicos para módulos con comportamiento propio:
+
+- `KIOKO_CONTEX.MD`: documentación detallada del módulo kiosco, su consumo de datos, fullscreen, operador y meteorología.
+- `ADMIN_CONTEX.MD`: documentación detallada del módulo admin, autenticación, sesión, permisos operativos y gestión de partidos.
+
 ## Funcionalidades Nuevas Documentadas
 
 - Endpoint resumido de partidos para home y kiosco mediante `?resource=partidos&vista=resumen`.

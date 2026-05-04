@@ -41,6 +41,16 @@ interface OpenMeteoResponse {
   }
 }
 
+interface WeatherSummary {
+  temperature: number
+  apparent: number
+  wind: number
+  label: string
+  max: number
+  min: number
+  rain: number
+}
+
 function getDefaultKioskSettings(): KioskSettings {
   return {
     fixedDisciplineId: 'all',
@@ -400,7 +410,7 @@ export function KioscoPage() {
   const visibleTodayMatches = useMemo(() => (isFullscreen ? partidosDeHoy.slice(0, 4) : partidosDeHoy.slice(0, 6)), [isFullscreen, partidosDeHoy])
   const visibleUpcomingMatches = useMemo(() => (isFullscreen ? proximos.slice(0, 4) : proximos), [isFullscreen, proximos])
   const visibleRecentResults = useMemo(() => (isFullscreen ? resultadosRecientes.slice(0, 4) : resultadosRecientes), [isFullscreen, resultadosRecientes])
-  const weatherSummary = useMemo(() => {
+  const weatherSummary = useMemo<WeatherSummary | null>(() => {
     const current = weatherQ.data?.current
     const daily = weatherQ.data?.daily
 
@@ -416,6 +426,34 @@ export function KioscoPage() {
       rain: Math.round(Number(daily?.precipitation_probability_max?.[0] ?? 0)),
     }
   }, [weatherQ.data])
+
+  const weatherStatusLabel = weatherQ.isPending
+    ? 'Cargando clima de San Fernando...'
+    : weatherQ.isError
+      ? 'Clima no disponible en este momento'
+      : weatherSummary
+        ? `San Fernando, CL · ${weatherSummary.temperature}°C · ${weatherSummary.label} · Lluvia ${weatherSummary.rain}%`
+        : 'Sin datos meteorológicos todavía'
+
+  const weatherDetailLabel = weatherQ.isError
+    ? (weatherQ.error as Error)?.message || 'La consulta meteorológica falló y el kiosco la estaba ocultando por completo.'
+    : weatherQ.isPending
+      ? 'La consulta meteorológica sigue en curso. El fixture debe seguir visible mientras tanto.'
+      : 'Meteorología gratuita activa con Open-Meteo para San Fernando, Chile.'
+
+  const weatherCards = weatherSummary
+    ? [
+        { label: 'Meteorología', value: weatherSummary.label },
+        { label: 'Temperatura', value: `${weatherSummary.temperature}°C` },
+        { label: 'Máx / mín', value: `${weatherSummary.max}° / ${weatherSummary.min}°` },
+        { label: 'Lluvia / viento', value: `${weatherSummary.rain}% · ${weatherSummary.wind} km/h` },
+      ]
+    : [
+        { label: 'Meteorología', value: weatherQ.isError ? 'No disponible' : 'Cargando...' },
+        { label: 'Temperatura', value: 'Sin dato' },
+        { label: 'Máx / mín', value: 'Sin dato' },
+        { label: 'Lluvia / viento', value: 'Sin dato' },
+      ]
 
   const relativeUpdatedText = getRelativeUpdateText(partidosQ.data?.updatedAt, now)
 
@@ -441,7 +479,13 @@ export function KioscoPage() {
       />
       <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(11,18,43,0.88),rgba(37,48,107,0.78),rgba(0,107,185,0.48))]" aria-hidden />
 
-      <div className={`relative mx-auto flex min-h-dvh max-w-[1800px] flex-col ${isFullscreen ? 'gap-3 p-3 md:p-4' : 'gap-6 p-4 md:p-8'}`}>
+      <div
+        className={`relative mx-auto flex min-h-dvh w-full flex-col ${
+          isFullscreen
+            ? 'max-w-[1920px] gap-3 px-[clamp(12px,1.8vw,28px)] py-[clamp(12px,1.8vh,24px)]'
+            : 'max-w-[1800px] gap-6 p-4 md:p-8'
+        }`}
+      >
         <header className={`flex flex-col ${isFullscreen ? 'gap-3 md:flex-row md:items-start md:justify-between' : 'gap-4 md:flex-row md:items-center md:justify-between'}`}>
           <div className="flex items-center gap-4">
             <div className="grid h-20 w-20 place-items-center rounded-2xl bg-white p-3 shadow-lg">
@@ -454,11 +498,9 @@ export function KioscoPage() {
               <div className="mt-3 flex flex-wrap gap-2 text-xs text-white/85">
                 <Badge className="border border-white/15 bg-white/10 px-3 py-1 text-white">{relativeUpdatedText}</Badge>
                 {changePulse ? <Badge className="border border-emerald-300/30 bg-emerald-400/15 px-3 py-1 text-emerald-100">{changePulse}</Badge> : null}
-                {weatherSummary ? (
-                  <Badge className="border border-white/15 bg-white/10 px-3 py-1 text-white">
-                    San Fernando, CL · {weatherSummary.temperature}°C · {weatherSummary.label} · Lluvia {weatherSummary.rain}%
-                  </Badge>
-                ) : null}
+                <Badge className={`border px-3 py-1 ${weatherQ.isError ? 'border-amber-300/35 bg-amber-400/15 text-amber-50' : 'border-white/15 bg-white/10 text-white'}`}>
+                  {weatherStatusLabel}
+                </Badge>
               </div>
             </div>
           </div>
@@ -515,26 +557,19 @@ export function KioscoPage() {
           ))}
         </div>
 
-        {weatherSummary ? (
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur-sm">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/60">Meteorología</p>
-              <p className="mt-1 text-lg font-semibold text-white">{weatherSummary.label}</p>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          {weatherCards.map((item) => (
+            <div
+              key={item.label}
+              className={`rounded-2xl border px-4 py-3 backdrop-blur-sm transition-all duration-500 ${
+                weatherQ.isError ? 'border-amber-300/25 bg-amber-400/10' : 'border-white/15 bg-white/10'
+              }`}
+            >
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/60">{item.label}</p>
+              <p className="mt-1 text-lg font-semibold text-white">{item.value}</p>
             </div>
-            <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur-sm">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/60">Temperatura</p>
-              <p className="mt-1 text-lg font-semibold text-white">{weatherSummary.temperature}°C</p>
-            </div>
-            <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur-sm">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/60">Máx / mín</p>
-              <p className="mt-1 text-lg font-semibold text-white">{weatherSummary.max}° / {weatherSummary.min}°</p>
-            </div>
-            <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur-sm">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/60">Lluvia / viento</p>
-              <p className="mt-1 text-lg font-semibold text-white">{weatherSummary.rain}% · {weatherSummary.wind} km/h</p>
-            </div>
-          </div>
-        ) : null}
+          ))}
+        </div>
 
         {campeonatosQ.isLoading || partidosQ.isLoading || allMatchesQ.isLoading || disciplinasQ.isLoading ? (
           <Skeleton className="h-96 w-full bg-white/20" />
@@ -547,7 +582,7 @@ export function KioscoPage() {
             </CardHeader>
           </Card>
         ) : (
-          <div className={`grid flex-1 min-h-0 ${isFullscreen ? 'gap-3 xl:grid-cols-12 xl:auto-rows-[minmax(0,1fr)]' : 'gap-6 xl:grid-cols-[1.25fr_0.75fr]'}`}>
+          <div className={`grid flex-1 min-h-0 ${isFullscreen ? 'gap-3 xl:grid-cols-12 xl:auto-rows-[minmax(0,1fr)] 2xl:gap-4' : 'gap-6 xl:grid-cols-[1.25fr_0.75fr]'}`}>
             <Card className={`border-white/20 bg-white/95 shadow-2xl transition-all duration-500 ${partidoEnCurso ? 'ring-4 ring-emerald-300/60 shadow-emerald-200/50' : ''} ${isFullscreen ? 'h-full xl:col-span-7' : ''}`}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 font-display text-3xl text-primary">
@@ -615,9 +650,10 @@ export function KioscoPage() {
                   Partidos de hoy
                 </CardTitle>
               </CardHeader>
-              <CardContent className={`space-y-3 ${isFullscreen ? 'min-h-0' : ''}`}>
+              <CardContent className={`space-y-3 ${isFullscreen ? 'min-h-0 overflow-hidden' : ''}`}>
                 {visibleTodayMatches.length ? (
-                  visibleTodayMatches.map((p) => (
+                  <div className="stagger-children space-y-3">
+                    {visibleTodayMatches.map((p) => (
                     <div key={p.id} className={`rounded-xl border border-primary/10 bg-surface transition ${updatedMatchIds.includes(p.id) ? 'ring-2 ring-emerald-300/70 shadow-lg shadow-emerald-200/40' : ''} ${isFullscreen ? 'p-3' : 'p-4'}`}>
                       <div className="mb-1 flex items-center justify-between gap-2">
                         <span className="font-score text-2xl font-bold text-primary">{formatPartidoTime(p.hora)}</span>
@@ -632,7 +668,8 @@ export function KioscoPage() {
                       </p>
                       <p className="text-xs text-muted">{p.genero} · {p.grupo || p.fase}</p>
                     </div>
-                  ))
+                    ))}
+                  </div>
                 ) : (
                   <p className="text-muted">No hay partidos para hoy.</p>
                 )}
@@ -660,14 +697,14 @@ export function KioscoPage() {
                 </div>
               </CardHeader>
               <CardContent className={`overflow-hidden ${isFullscreen ? 'min-h-0' : ''}`}>
-                <div key={activePanel} className="animate-in fade-in slide-in-from-bottom-3 duration-500">
+                <div key={activePanel} className={`animate-fade-up transition-all duration-700 ${isFullscreen ? 'min-h-[320px]' : 'min-h-[260px]'}`}>
                 {activePanel === 'timeline' ? (
                   <div className="space-y-4">
                     <div className="flex items-center gap-2 text-primary">
                       <Timeline className="h-5 w-5" />
                       <p className="text-sm font-semibold">Línea de tiempo de hoy</p>
                     </div>
-                    <div className={isFullscreen ? 'grid gap-3 md:grid-cols-2 xl:grid-cols-4' : 'flex gap-3 overflow-x-auto pb-2'}>
+                    <div className={`${isFullscreen ? 'grid gap-3 md:grid-cols-2 xl:grid-cols-4' : 'flex gap-3 overflow-x-auto pb-2'} stagger-children`}>
                       {visibleTodayMatches.length ? (
                         visibleTodayMatches.map((p) => (
                           <div key={p.id} className={`rounded-2xl border border-primary/10 bg-white ${isFullscreen ? 'p-3' : 'min-w-[260px] p-4'} ${updatedMatchIds.includes(p.id) ? 'ring-2 ring-emerald-300/70' : ''}`}>
@@ -694,7 +731,7 @@ export function KioscoPage() {
                       <Trophy className="h-5 w-5" />
                       <p className="text-sm font-semibold">Últimos resultados registrados</p>
                     </div>
-                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    <div className="stagger-children grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                       {visibleRecentResults.length ? (
                         visibleRecentResults.map((p) => (
                           <div key={p.id} className={`rounded-xl border border-primary/10 bg-white ${isFullscreen ? 'p-3' : 'p-4'} ${updatedMatchIds.includes(p.id) ? 'ring-2 ring-emerald-300/70' : ''}`}>
@@ -729,7 +766,7 @@ export function KioscoPage() {
                         <p className="text-sm text-muted">Se muestran sus últimos cruces finalizados dentro del campeonato filtrado.</p>
                       </div>
                     ) : null}
-                    <div className="grid gap-3 md:grid-cols-3">
+                    <div className="stagger-children grid gap-3 md:grid-cols-3">
                       {historialCruce.length ? (
                         historialCruce.map((p) => (
                           <div key={p.id} className="rounded-xl border border-primary/10 bg-white p-4">
@@ -754,7 +791,7 @@ export function KioscoPage() {
                       <Sparkles className="h-5 w-5" />
                       <p className="text-sm font-semibold">Avisos operativos de la jornada</p>
                     </div>
-                    <div className="grid gap-3 md:grid-cols-2">
+                    <div className="stagger-children grid gap-3 md:grid-cols-2">
                       {avisosOperativos.length ? (
                         avisosOperativos.map((note) => (
                           <div key={note} className="rounded-xl border border-primary/10 bg-white p-4 text-sm font-medium text-primary">
@@ -765,8 +802,8 @@ export function KioscoPage() {
                         <p className="text-sm text-muted">Sin avisos logísticos relevantes por ahora.</p>
                       )}
                     </div>
-                    <div className="rounded-2xl border border-dashed border-primary/20 bg-primary/5 p-4 text-sm text-muted">
-                      Meteorología gratuita activa con Open-Meteo para San Fernando, Chile. Si luego quieres pronóstico por sede exacta, solo hay que cambiar latitud y longitud.
+                    <div className={`rounded-2xl border border-dashed p-4 text-sm ${weatherQ.isError ? 'border-amber-300/35 bg-amber-50 text-amber-900' : 'border-primary/20 bg-primary/5 text-muted'}`}>
+                      {weatherDetailLabel} Si luego quieres pronóstico por sede exacta, solo hay que cambiar latitud y longitud.
                     </div>
                   </div>
                 ) : null}
