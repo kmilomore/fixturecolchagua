@@ -1,0 +1,310 @@
+/**
+ * CSVImport.gs
+ * Migra filas desde la hoja "import_temp" hacia "partidos".
+ * Soporta la estructura plana:
+ * DEPORTE, FECHA, LUGAR, Hora, Local, Visita, Género, Grupo.
+ * Headers flexibles: se normalizan a minúsculas y sin acentos.
+ *
+ * Columnas destino en "partidos":
+ * id, campeonatoId, disciplinaId, disciplina, fecha, hora, lugar, localId, visitaId,
+ * marcadorLocal, marcadorVisita, fase, genero, categoria, grupo, estado, jornada
+ */
+
+var CSVImport = {
+  migrateFromTemp: function (payload) {
+    payload = payload || {};
+    const campeonatoId = payload.campeonatoId;
+    const disciplinaId = payload.disciplinaId;
+    const disciplinaNombre = payload.disciplina || 'VOLEIBOL';
+    const categoriaDefault = payload.categoria || 'Sub14';
+    const autoCrearEquipos = payload.autoCrearEquipos !== false;
+    if (!campeonatoId || !disciplinaId) {
+      return errorResponse('campeonatoId y disciplinaId son obligatorios', 400);
+    }
+
+    const rows = sheetToObjects('import_temp');
+    if (!rows.length) {
+      return errorResponse('import_temp vacía o sin datos', 400);
+    }
+
+    const equipos = sheetToObjects('equipos');
+    const equipoByNombre = {};
+    equipos.forEach(function (e) {
+      if (e.campeonatoId === campeonatoId && e.disciplinaId === disciplinaId) {
+        const key = CSVImport.equipoKey_(e.nombre, e.genero, e.categoria);
+        equipoByNombre[key] = e.id;
+      }
+    });
+
+    const partidosExistentes = sheetToObjects('partidos');
+    let created = 0;
+    let teamsCreated = 0;
+    let skipped = 0;
+    rows.forEach(function (raw, idx) {
+      const norm = CSVImport.normalizeRow_(raw);
+      const localNombre = norm.local || norm.localnombre || norm.equipolocal;
+      const visitaNombre = norm.visita || norm.visitante || norm.equipovisita;
+      const genero = CSVImport.normalizeGenero_(norm.genero || 'Damas');
+      const categoria = norm.categoria || categoriaDefault;
+      const grupo = CSVImport.normalizeGrupo_(norm.grupo || norm.numerogrupo || norm.gruponumero || '');
+      const localId = norm.localid || CSVImport.ensureEquipo_({
+        campeonatoId: campeonatoId,
+        disciplinaId: disciplinaId,
+        nombre: localNombre,
+        genero: genero,
+        categoria: categoria,
+        grupo: grupo,
+        equipoByNombre: equipoByNombre,
+        autoCrear: autoCrearEquipos
+      });
+      const visitaId = norm.visitaid || CSVImport.ensureEquipo_({
+        campeonatoId: campeonatoId,
+        disciplinaId: disciplinaId,
+        nombre: visitaNombre,
+        genero: genero,
+        categoria: categoria,
+        grupo: grupo,
+        equipoByNombre: equipoByNombre,
+        autoCrear: autoCrearEquipos
+      });
+      if (!localId || !visitaId) {
+        skipped++;
+        return;
+      }
+
+      const fecha = CSVImport.normalizeFecha_(norm.fecha || '');
+      const hora = norm.hora || '';
+      const partidoYaExiste = partidosExistentes.some(function (p) {
+        return String(p.campeonatoId) === String(campeonatoId) &&
+          String(p.disciplinaId) === String(disciplinaId) &&
+          CSVImport.normalizeFecha_(p.fecha) === String(fecha) &&
+          String(p.hora) === String(hora) &&
+          String(p.localId) === String(localId) &&
+          String(p.visitaId) === String(visitaId);
+      });
+
+      if (partidoYaExiste) {
+        const existente = partidosExistentes.find(function (p) {
+          return String(p.campeonatoId) === String(campeonatoId) &&
+            String(p.disciplinaId) === String(disciplinaId) &&
+            CSVImport.normalizeFecha_(p.fecha) === String(fecha) &&
+            String(p.hora) === String(hora) &&
+            String(p.localId) === String(localId) &&
+            String(p.visitaId) === String(visitaId);
+        });
+        if (existente && existente.id) {
+          updateRowById('partidos', existente.id, {
+            fecha: fecha,
+            grupo: grupo,
+            disciplina: norm.disciplina || norm.deporte || disciplinaNombre,
+            genero: genero,
+            categoria: categoria
+          });
+        }
+        skipped++;
+        return;
+      }
+
+      const partido = {
+        id: generateUUID(),
+        campeonatoId: campeonatoId,
+        disciplinaId: disciplinaId,
+        disciplina: norm.disciplina || norm.deporte || disciplinaNombre,
+        fecha: fecha,
+        hora: hora,
+        lugar: norm.lugar || 'GIMNASIO TECHADO',
+        localId: localId,
+        visitaId: visitaId,
+        marcadorLocal: norm.marcadorlocal !== undefined && norm.marcadorlocal !== '' ? norm.marcadorlocal : '',
+        marcadorVisita: norm.marcadorvisita !== undefined && norm.marcadorvisita !== '' ? norm.marcadorvisita : '',
+        fase: norm.fase || 'grupos',
+        genero: genero,
+        categoria: categoria,
+        grupo: grupo,
+        estado: norm.estado || 'programado',
+        jornada: norm.jornada !== undefined && norm.jornada !== '' ? norm.jornada : idx + 1
+      };
+
+      if (partido.estado === 'finalizado' || (partido.marcadorLocal !== '' && partido.marcadorVisita !== '')) {
+        if (partido.marcadorLocal !== '' && partido.marcadorVisita !== '') {
+          partido.estado = 'finalizado';
+        }
+      }
+
+      appendRow('partidos', partido);
+      teamsCreated = Object.keys(equipoByNombre).filter(function (k) {
+        return String(k).indexOf('__created__') >= 0;
+      }).length;
+      created++;
+    });
+
+    CSVImport.rebuildGrupos_(campeonatoId, disciplinaId);
+
+    return jsonResponse({
+      migrated: true,
+      partidosCreated: created,
+      teamsCreated: teamsCreated,
+      skippedRows: skipped
+    });
+  },
+
+  normalizeRow_: function (raw) {
+    const out = {};
+    Object.keys(raw).forEach(function (k) {
+      const nk = CSVImport.normalizeKey_(k);
+      out[nk] = raw[k];
+    });
+    return out;
+  },
+
+  normalizeKey_: function (value) {
+    return String(value)
+      .trim()
+      .toLowerCase()
+      .replace(/[áàäâ]/g, 'a')
+      .replace(/[éèëê]/g, 'e')
+      .replace(/[íìïî]/g, 'i')
+      .replace(/[óòöô]/g, 'o')
+      .replace(/[úùüû]/g, 'u')
+      .replace(/ñ/g, 'n')
+      .replace(/\s+/g, '');
+  },
+
+  normalizeGenero_: function (value) {
+    const raw = CSVImport.normalizeKey_(value);
+    if (raw === 'varones' || raw === 'varon' || raw === 'masculino') return 'Varones';
+    return 'Damas';
+  },
+
+  normalizeGrupo_: function (value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    const normalized = CSVImport.normalizeKey_(raw);
+    if (normalized.indexOf('grupo') === 0) return raw;
+    return 'Grupo ' + raw;
+  },
+
+  normalizeFecha_: function (value) {
+    if (!value) return '';
+
+    if (Object.prototype.toString.call(value) === '[object Date]' && !isNaN(value.getTime())) {
+      return Utilities.formatDate(value, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    }
+
+    const raw = String(value).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+
+    const ddmmyyyy = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (ddmmyyyy) {
+      const day = ('0' + ddmmyyyy[1]).slice(-2);
+      const month = ('0' + ddmmyyyy[2]).slice(-2);
+      return ddmmyyyy[3] + '-' + month + '-' + day;
+    }
+
+    const parsed = new Date(raw);
+    if (!isNaN(parsed.getTime())) {
+      return Utilities.formatDate(parsed, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+    }
+
+    return raw;
+  },
+
+  equipoKey_: function (nombre, genero, categoria) {
+    return [
+      CSVImport.normalizeKey_(nombre || ''),
+      CSVImport.normalizeKey_(genero || ''),
+      CSVImport.normalizeKey_(categoria || '')
+    ].join('|');
+  },
+
+  ensureEquipo_: function (options) {
+    const nombre = String(options.nombre || '').trim();
+    if (!nombre) return '';
+
+    const key = CSVImport.equipoKey_(nombre, options.genero, options.categoria);
+    if (options.equipoByNombre[key]) {
+      if (options.grupo) {
+        updateRowById('equipos', options.equipoByNombre[key], { grupo: options.grupo });
+      }
+      return options.equipoByNombre[key];
+    }
+    if (!options.autoCrear) return '';
+
+    const id = generateUUID();
+    appendRow('equipos', {
+      id: id,
+      campeonatoId: options.campeonatoId,
+      disciplinaId: options.disciplinaId,
+      nombre: nombre,
+      establecimiento: nombre,
+      genero: options.genero,
+      categoria: options.categoria,
+      grupo: options.grupo || ''
+    });
+    options.equipoByNombre[key] = id;
+    options.equipoByNombre[key + '__created__'] = id;
+    return id;
+  },
+
+  rebuildGrupos_: function (campeonatoId, disciplinaId) {
+    const equipos = sheetToObjects('equipos').filter(function (e) {
+      return String(e.campeonatoId) === String(campeonatoId) &&
+        String(e.disciplinaId) === String(disciplinaId) &&
+        String(e.grupo || '').trim() !== '';
+    });
+
+    const gruposMap = {};
+    equipos.forEach(function (e) {
+      const nombre = CSVImport.normalizeGrupo_(e.grupo);
+      const key = [
+        campeonatoId,
+        disciplinaId,
+        CSVImport.normalizeKey_(e.genero || ''),
+        CSVImport.normalizeKey_(e.categoria || ''),
+        CSVImport.normalizeKey_(nombre)
+      ].join('|');
+
+      if (!gruposMap[key]) {
+        gruposMap[key] = {
+          campeonatoId: campeonatoId,
+          disciplinaId: disciplinaId,
+          nombre: nombre,
+          genero: e.genero || 'Damas',
+          categoria: e.categoria || 'Sub14',
+          equiposIds: []
+        };
+      }
+      if (gruposMap[key].equiposIds.indexOf(e.id) < 0) {
+        gruposMap[key].equiposIds.push(e.id);
+      }
+    });
+
+    const existentes = sheetToObjects('grupos');
+    Object.keys(gruposMap).forEach(function (key) {
+      const g = gruposMap[key];
+      const existente = existentes.find(function (row) {
+        return String(row.campeonatoId) === String(g.campeonatoId) &&
+          String(row.disciplinaId) === String(g.disciplinaId) &&
+          String(row.nombre) === String(g.nombre) &&
+          String(row.genero) === String(g.genero) &&
+          String(row.categoria) === String(g.categoria);
+      });
+
+      const payload = {
+        campeonatoId: g.campeonatoId,
+        disciplinaId: g.disciplinaId,
+        nombre: g.nombre,
+        genero: g.genero,
+        categoria: g.categoria,
+        equiposIds: g.equiposIds.join(',')
+      };
+
+      if (existente && existente.id) {
+        updateRowById('grupos', existente.id, payload);
+      } else {
+        payload.id = generateUUID();
+        appendRow('grupos', payload);
+      }
+    });
+  }
+};
