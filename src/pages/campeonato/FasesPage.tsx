@@ -5,6 +5,8 @@ import { api } from '@/api/gasClient'
 import { hasGasUrl } from '@/config'
 import { useCampeonatoOutlet } from '@/pages/campeonato/outletContext'
 import { BracketView } from '@/components/BracketView'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { Partido } from '@/types'
 import { formatPartidoDateKey, formatPartidoTime } from '@/utils/formatDate'
@@ -45,5 +47,23 @@ export function FasesPage() {
   if (q.isLoading) return <Skeleton className="h-64 w-full" />
   if (q.isError) return <p className="text-accent">{(q.error as Error).message}</p>
 
-  return <BracketView semifinales={semis} final={final_} tercer={tercer} />
+  const finalState = final_?.estado || 'sin final'
+
+  return (
+    <div className="space-y-6">
+      <Card className="border-primary/10 bg-primary/5">
+        <CardHeader>
+          <CardTitle className="text-2xl text-primary">Narrativa eliminatoria</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+          <Badge>{semis.length} semifinal(es)</Badge>
+          <Badge variant="secondary">Estado de final: {finalState}</Badge>
+          {categoria ? <Badge variant="muted">Categoria: {categoria}</Badge> : null}
+          <Badge variant="muted">Genero: {genero}</Badge>
+        </CardContent>
+      </Card>
+
+      <BracketView semifinales={semis} final={final_} tercer={tercer} />
+    </div>
+  )
 }

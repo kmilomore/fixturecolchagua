@@ -29,6 +29,9 @@ export function CampeonatoLayout() {
 
   const disciplinas = disciplinasQ.data || []
   const disciplinaId = params.get('disciplinaId') || disciplinas[0]?.id || ''
+  const genero = params.get('genero') || 'Damas'
+  const categoria = params.get('categoria') || ''
+  const fase = params.get('fase') || 'grupos'
   const disciplinaActual = disciplinas.find((disciplina) => disciplina.id === disciplinaId) || disciplinas[0] || null
   const currentSearch = params.toString()
 
@@ -93,33 +96,47 @@ export function CampeonatoLayout() {
   return (
     <div className="space-y-6">
       <div className="overflow-hidden rounded-2xl border border-white/20 bg-[image:var(--gradient-brand)] shadow-sm">
-        <div className="flex flex-col gap-4 px-5 py-6 text-white md:flex-row md:items-center md:justify-between">
-          <div className="flex items-center gap-4">
-            <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-white p-2 shadow">
-              <img src="/SLEPCOLCHAGUA.webp" alt="SLEP Colchagua" className="h-full w-full object-contain" />
+        <div className="flex flex-col gap-5 px-5 py-6 text-white">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-center gap-4">
+              <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-white p-2 shadow">
+                <img src="/SLEPCOLCHAGUA.webp" alt="SLEP Colchagua" className="h-full w-full object-contain" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs font-semibold uppercase tracking-wide text-white/70">Campeonato</p>
+                <h1 className="font-display text-3xl font-semibold">{c?.nombre}</h1>
+                <div className="flex flex-wrap items-center gap-2 text-sm text-white/75">
+                  <p>
+                    {c?.año} · {c?.estado}
+                  </p>
+                  {disciplinaActual ? (
+                    <Badge className="border border-white/20 bg-white/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white backdrop-blur-sm">
+                      {disciplinaActual.nombre}
+                    </Badge>
+                  ) : null}
+                </div>
+              </div>
             </div>
-            <div className="space-y-1">
-              <p className="text-xs font-semibold uppercase tracking-wide text-white/70">Campeonato</p>
-              <h1 className="font-display text-3xl font-semibold">{c?.nombre}</h1>
-              <div className="flex flex-wrap items-center gap-2 text-sm text-white/75">
-                <p>
-                  {c?.año} · {c?.estado}
-                </p>
-                {disciplinaActual ? (
-                  <Badge className="border border-white/20 bg-white/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white backdrop-blur-sm">
-                    {disciplinaActual.nombre}
-                  </Badge>
-                ) : null}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white ring-1 ring-white/15">
+                Fixture público
+              </div>
+              <div className="rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white ring-1 ring-white/15">
+                {disciplinas.length} disciplina(s)
               </div>
             </div>
           </div>
-          <div className="rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white ring-1 ring-white/15">
-            Fixture público
+
+          <div className="flex flex-wrap gap-2 text-xs text-white/90">
+            <Badge className="border border-white/20 bg-white/10 px-3 py-1 text-white">Genero: {genero}</Badge>
+            {categoria ? <Badge className="border border-white/20 bg-white/10 px-3 py-1 text-white">Categoria: {categoria}</Badge> : null}
+            <Badge className="border border-white/20 bg-white/10 px-3 py-1 text-white">Fase: {fase}</Badge>
+            <Badge className="border border-white/20 bg-white/10 px-3 py-1 text-white">Vista: {navLabelFromPath(locationLabel())}</Badge>
           </div>
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 rounded-xl border border-primary/10 bg-white p-2 shadow-sm">
+      <div className="sticky top-2 z-10 flex flex-wrap gap-2 rounded-xl border border-primary/10 bg-white/95 p-2 shadow-sm backdrop-blur">
         <NavLink
           to={{ pathname: `/campeonatos/${id}`, search: currentSearch ? `?${currentSearch}` : '' }}
           end
@@ -160,4 +177,29 @@ export function CampeonatoLayout() {
       <Outlet context={{ campeonatoId: id!, disciplinaId, disciplinas }} />
     </div>
   )
+}
+
+function locationLabel() {
+  if (typeof window === 'undefined') return 'resumen'
+  const path = window.location.pathname
+  if (path.endsWith('/calendario')) return 'calendario'
+  if (path.endsWith('/grupos')) return 'grupos'
+  if (path.endsWith('/fases')) return 'fases'
+  if (path.endsWith('/partidos')) return 'partidos'
+  return 'resumen'
+}
+
+function navLabelFromPath(label: string) {
+  switch (label) {
+    case 'calendario':
+      return 'Calendario'
+    case 'grupos':
+      return 'Grupos'
+    case 'fases':
+      return 'Fases'
+    case 'partidos':
+      return 'Partidos'
+    default:
+      return 'Resumen'
+  }
 }

@@ -11,6 +11,7 @@ Su objetivo es explicar:
 - Cómo está construido en frontend.
 - Qué decisiones de UX y operación lo definen.
 - Cómo se relaciona con campeonatos, disciplinas, partidos y resúmenes públicos.
+- Cómo se relaciona con el nuevo filtro por escuela y la vista institucional completa.
 - Qué puntos están listos hoy y cuáles son extensiones naturales futuras.
 
 ---
@@ -91,7 +92,7 @@ Por eso prioriza:
 
 ## Datos que consume
 
-El kiosco mezcla tres fuentes principales de datos:
+El kiosco mezcla varias fuentes principales de datos:
 
 ### 1. Campeonatos
 
@@ -166,6 +167,21 @@ Uso:
 - identificar el siguiente partido del mismo recinto,
 - detectar cambios entre refresh y resaltarlos,
 - derivar alertas operativas.
+
+### 4.1. Equipos del campeonato activo
+
+Cliente:
+
+```txt
+api.equipos.getByCampeonato(campeonatoId)
+```
+
+Uso:
+
+- construir el selector de escuelas del kiosco,
+- agrupar equipos por `establecimiento`,
+- resolver qué equipos pertenecen a una escuela seleccionada,
+- y filtrar la vista completa del kiosco por esa escuela.
 
 ### 5. Meteorología gratuita externa
 
@@ -253,6 +269,19 @@ La disciplina se muestra de forma explícita en:
 - próximos encuentros.
 
 Esto es crítico porque el campeonato puede contener varios deportes simultáneos.
+
+### 2.1. Vista completa por escuela
+
+El kiosco ahora puede operar en modo general o en modo **escuela**.
+
+La lógica actual permite:
+
+- seleccionar una escuela desde la franja superior,
+- persistir esa selección en `localStorage`,
+- reconstruir toda la vista usando solo partidos donde participe esa escuela,
+- y conservar el resto de la lógica operacional del kiosco dentro de ese alcance.
+
+Eso transforma el kiosco en una vista útil no solo para recintos generales, sino también para proyectar el fixture completo de un establecimiento específico.
 
 ### 3. Orden inteligente de partidos de hoy
 
@@ -356,6 +385,7 @@ slep_kiosk_settings_v1
 ```ts
 interface KioskSettings {
   fixedDisciplineId: string
+  fixedSchoolName: string
   rotationSeconds: number
   autoFullscreen: boolean
 }
@@ -364,6 +394,7 @@ interface KioskSettings {
 ### Significado
 
 - `fixedDisciplineId`: fija una disciplina concreta o usa `all`.
+- `fixedSchoolName`: fija una escuela concreta o usa `all`.
 - `rotationSeconds`: controla cada cuántos segundos cambia el panel rotativo.
 - `autoFullscreen`: intenta abrir el módulo en pantalla completa automáticamente.
 
@@ -376,6 +407,13 @@ Operador
 ```
 
 Esto permite usar el kiosco sin tocar código ni variables de entorno.
+
+Además del modal, la franja superior del kiosco ahora expone directamente un selector de escuela. Esa franja dejó de usar los textos operativos compactos anteriores como:
+
+- `Disciplina visible`
+- `Rotación 12s`
+
+En su lugar prioriza un control funcional: elegir la escuela que se quiere proyectar.
 
 ---
 
@@ -402,6 +440,7 @@ Hoy el comportamiento esperado es:
 - reorganiza paneles en una grilla más estable,
 - reduce tamaño tipográfico en resoluciones más bajas,
 - activa modos compactos según ancho/alto real del viewport,
+- compacta agresivamente bloques secundarios cuando su alto no alcanza,
 - y evita que listas largas empujen contenido crítico fuera de la pantalla.
 
 ### Estrategia actual de fullscreen
@@ -430,6 +469,15 @@ Estos modos ajustan automáticamente:
 - tamaño del marcador,
 - cantidad visible de partidos por bloque,
 - y densidad del panel rotativo.
+
+También existe compactación específica por bloque. En particular, `Próximos encuentros` reduce:
+
+- cantidad de tarjetas visibles,
+- número de columnas,
+- padding interno,
+- y densidad tipográfica,
+
+para asegurar que el contenido permanezca dentro de su card asignada sin desbordar márgenes.
 
 Esto no garantiza matemáticamente que toda combinación de datos entre en cualquier resolución, pero sí establece una estrategia práctica y escalable para pantallas grandes.
 
@@ -467,7 +515,7 @@ Paneles disponibles hoy:
 
 #### Timeline
 
-Muestra una línea de tiempo del día usando partidos filtrados por la disciplina visible.
+Muestra una línea de tiempo del día usando partidos filtrados por la disciplina visible y, si aplica, por la escuela seleccionada.
 
 Sirve para:
 
@@ -498,6 +546,8 @@ Sirve para:
 #### Avisos
 
 Muestra alertas logísticas derivadas y el bloque explicativo del clima.
+
+Cuando el kiosco está filtrado por escuela, los paneles rotativos respetan ese mismo alcance en lugar de mezclar contexto general del campeonato.
 
 Sirve para:
 
@@ -614,6 +664,7 @@ Sin esos datos limpios, el kiosco perdería claridad operativa.
 - `localStorage` para configuración del operador.
 - `Fullscreen API` del navegador para modo inmersivo.
 - función serverless propia para proxy meteorológico.
+- dataset de equipos para construir filtros por escuela.
 
 ---
 
@@ -628,6 +679,7 @@ El kiosco maneja varios estados simultáneos:
 - carga de clima,
 - timeout de clima,
 - error de clima visible,
+- escuela visible seleccionada,
 - estado visual fullscreen,
 - estado del panel rotativo,
 - cambios recientes detectados,
@@ -657,6 +709,16 @@ La mitigación actual incluye:
 - `line-clamp` en zonas sensibles,
 - compactación tipográfica progresiva,
 - y reducción de tarjetas visibles en bloques secundarios.
+
+### 2.1. Desborde en bloques secundarios de fullscreen
+
+El bloque más sensible hoy es `Próximos encuentros`.
+
+Hallazgo operativo confirmado:
+
+- hacer tarjetas ligeramente más pequeñas no siempre basta,
+- el verdadero control está en cuántas tarjetas se permiten por altura disponible,
+- y el bloque debe poder reducirse a una sola tarjeta en fullscreen cuando el viewport lo exige.
 
 ### 3. Meteorología externa
 
@@ -697,6 +759,7 @@ Extensiones que encajan naturalmente con este módulo:
 - integración con tablas de grupo del partido destacado.
 - integración con llave eliminatoria cuando el partido sea de fases finales.
 - compactación selectiva adicional para `Próximos encuentros` y paneles secundarios según resolución.
+- priorización más inteligente de partidos cuando la escuela seleccionada tiene muchos encuentros el mismo día.
 
 ---
 

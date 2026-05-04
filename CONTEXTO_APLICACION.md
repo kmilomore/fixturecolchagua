@@ -65,6 +65,7 @@ FIXTURE 2.0/
 Además de este contexto general, existen documentos específicos para módulos con comportamiento propio:
 
 - `KIOKO_CONTEX.MD`: documentación detallada del módulo kiosco, su consumo de datos, fullscreen, operador y meteorología.
+- `KIOKO_CONTEX.MD` debe considerarse la fuente de verdad para fullscreen del kiosco, selector por escuela, compactación por resolución y fallback meteorológico.
 - `ADMIN_CONTEX.MD`: documentación detallada del módulo admin, autenticación, sesión, permisos operativos y gestión de partidos.
 
 ## Funcionalidades Nuevas Documentadas
@@ -78,6 +79,9 @@ Además de este contexto general, existen documentos específicos para módulos 
 - Persistencia del filtro de disciplina, género, categoría y fase al navegar entre Resumen, Calendario, Grupos, Fases y Partidos dentro de un campeonato.
 - Refuerzo visual de la disciplina activa en el módulo de campeonato: tabs con mayor contraste, bloque de filtro con disciplina seleccionada y badge visible en el banner.
 - Visibilidad explícita de la disciplina en los resúmenes públicos: `Próximo partido` de la home y tarjetas de `KioscoPage` para siguiente partido, partidos de hoy y próximos encuentros.
+- Proxy same-origin `/api/weather` para meteorología del kiosco, evitando dependencia directa de `connect-src` externo en el navegador.
+- Kiosco con fullscreen sin scroll, compactación automática por resolución y contención estricta de bloques secundarios.
+- Modo kiosco filtrable por escuela usando `equipos.establecimiento`, con persistencia local de la selección.
 
 ## Identidad Visual
 
@@ -397,7 +401,7 @@ En ese modo, `disciplinaId` deja de ser obligatorio porque el backend lo resuelv
 - `/`: inicio y campeonato destacado.
 - `/campeonatos`: listado de campeonatos.
 - `/mis-partidos`: búsqueda pública por establecimiento para ver solo sus partidos.
-- `/kiosco`: modo pantalla completa/proyector con próximo partido, partidos de hoy y próximos encuentros.
+- `/kiosco`: modo pantalla completa/proyector con próximo partido, partidos de hoy, próximos encuentros, filtro por escuela y meteorología resiliente.
 - `/campeonatos/:id`: resumen del campeonato.
 - `/campeonatos/:id/calendario`: calendario mensual real.
 - `/campeonatos/:id/grupos`: grupos y tablas.
@@ -429,6 +433,7 @@ La ruta `/campeonatos/nuevo` no debe ser pública. Si el usuario no tiene sesió
 - `src/pages/campeonato/CampeonatoLayout.tsx`: cabecera de campeonato con gradiente institucional.
 - `src/pages/MisPartidosPage.tsx`: vista pública para buscar partidos por establecimiento.
 - `src/pages/KioscoPage.tsx`: modo kiosco/proyector con actualización automática cada 60 segundos y reloj aislado para no rerenderizar toda la vista por segundo.
+- `api/weather.ts`: proxy serverless same-origin para meteorología del kiosco en producción.
 - `src/pages/admin/AdminResultadosPage.tsx`: flujo de marcadores con feedback de guardado, selección automática de campeonato activo y estados vacíos operativos.
 - `src/utils/formatDate.ts`: normalización y formato de fechas/horas.
 - `src/utils/matches.ts`: helpers para próximo partido, partidos de hoy, búsqueda y ordenamiento.
@@ -473,6 +478,11 @@ Debe usar scroll horizontal en pantallas pequeñas, no apilar botones verticalme
 - La navegación móvil usa acceso directo al fixture del campeonato activo para reducir fricción de consulta.
 - La vista `Mis partidos` filtra por coincidencia parcial en `localNombre`, `visitaNombre`, `localId` y `visitaId`, y muestra estados vacíos guiados cuando no hay campeonato, no hay resultados o no se ha iniciado búsqueda.
 - El modo kiosco consulta partidos cada 60 segundos mediante TanStack Query (`refetchInterval`) y usa el endpoint resumido para reducir carga de red y procesamiento.
+- El modo kiosco complementa `vista=resumen` con consulta completa de partidos y equipos para construir filtros internos, historial, alertas y vista completa por escuela.
+- El selector de escuela del kiosco se apoya en `equipos.establecimiento` y persiste su estado en `localStorage` junto con la configuración del operador.
+- La meteorología del kiosco ya no debe consumirse directamente desde Open-Meteo en el navegador productivo; se canaliza por `/api/weather`.
+- El fullscreen del kiosco está diseñado como canvas fijo sin scroll. Si un bloque secundario tensiona el viewport, se debe reducir cantidad visible de tarjetas antes que permitir desborde.
+- El bloque `Próximos encuentros` es especialmente sensible a la altura disponible y puede reducirse hasta una sola tarjeta en fullscreen para conservar integridad visual.
 - `AdminResultadosPage` prioriza automáticamente el campeonato activo cuando existe y muestra resumen de pendientes/finalizados.
 - Al guardar un resultado desde admin, el usuario recibe confirmación visible y luego se invalidan queries de `partidos` y `tabla` para refrescar datos relacionados.
 - Los guards de rutas admin ya no deben basarse solo en un booleano persistido; la sesión debe considerarse válida solo mientras no expire.
@@ -496,6 +506,7 @@ Debe usar scroll horizontal en pantallas pequeñas, no apilar botones verticalme
 - No agregar botones públicos de "Crear campeonato" en home o listado sin validar admin.
 - No volver a duplicar en móvil accesos que lleven al mismo destino, como `Campeonatos` y `Fixture` apuntando ambos a `/campeonatos`.
 - No usar el query completo de partidos en home o kiosco si el resumen agregado cubre la necesidad.
+- No asumir que hacer una tarjeta más pequeña resuelve por sí solo el desborde en fullscreen; en el kiosco el control real suele ser cantidad visible por bloque.
 - No usar amarillo/dorado para acciones principales; la paleta actual usa azul profundo, azul SLEP, rojo y gris claro.
 - No cambiar el logo por otro archivo sin actualizar `index.html`, `AppShell` y la portada.
 - No envolver `/kiosco` en `AppShell`; debe conservar pantalla completa sin navbar.
@@ -518,6 +529,9 @@ Después de cambiar `.env.local`, reiniciar `npm run dev`.
 Después de cambiar archivos `gas/*.gs`, copiar/actualizar en Apps Script y redeployar la Web App.
 
 ## Próximos Pasos Recomendados
+
+- Mantener sincronizados `CONTEXTO_APLICACION.md` y `KIOKO_CONTEX.MD` cuando cambie la estrategia del kiosco.
+- Si el módulo kiosco gana más modos operativos por escuela o por recinto, documentarlos primero en `KIOKO_CONTEX.MD` y luego resumirlos aquí.
 
 - Agregar botón admin para ejecutar importación desde el frontend.
 - Agregar vista de detalle de partido.

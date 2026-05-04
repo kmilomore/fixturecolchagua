@@ -75,6 +75,14 @@ export interface BracketViewProps {
 export function BracketView({ semifinales, final, tercer, className }: BracketViewProps) {
   const [s1, s2] = [semifinales[0], semifinales[1]]
   const hasFases = Boolean(s1 || s2 || final || tercer)
+  const champion = winnerName(final)
+  const finalNarrative = !final
+    ? 'La final todavía no está cargada.'
+    : final.estado === 'finalizado'
+      ? 'La llave ya resolvió al campeón del campeonato.'
+      : final.estado === 'en_curso'
+        ? 'La final está en juego y define al campeón en vivo.'
+        : 'La final ya está programada y espera definición deportiva.'
 
   if (!hasFases) {
     return (
@@ -91,6 +99,27 @@ export function BracketView({ semifinales, final, tercer, className }: BracketVi
 
   return (
     <div className={cn('space-y-8', className)}>
+      <Card className="border-primary/10 bg-[linear-gradient(135deg,rgba(37,48,107,0.06),rgba(255,255,255,1))]">
+        <CardHeader>
+          <CardTitle className="text-xl text-primary">Lectura del cuadro final</CardTitle>
+          <CardDescription>{finalNarrative}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-3">
+          <div className="rounded-2xl border border-primary/10 bg-white px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted">Campeón proyectado</p>
+            <p className="mt-2 font-display text-2xl font-semibold text-primary">{champion}</p>
+          </div>
+          <div className="rounded-2xl border border-primary/10 bg-white px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted">Semifinales cargadas</p>
+            <p className="mt-2 font-score text-3xl font-bold text-secondary">{semifinales.length}</p>
+          </div>
+          <div className="rounded-2xl border border-primary/10 bg-white px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted">Tercer lugar</p>
+            <p className="mt-2 text-sm font-semibold text-primary">{tercer ? 'Disponible en la llave' : 'Aún no cargado'}</p>
+          </div>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Fases eliminatorias</CardTitle>
@@ -118,7 +147,7 @@ export function BracketView({ semifinales, final, tercer, className }: BracketVi
 
               <div className="rounded-2xl border border-primary/15 bg-primary/5 p-4 text-center">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted">Campeón</p>
-                <p className="mt-2 font-display text-2xl font-semibold text-primary">{winnerName(final)}</p>
+                <p className="mt-2 font-display text-2xl font-semibold text-primary">{champion}</p>
               </div>
             </div>
           </div>

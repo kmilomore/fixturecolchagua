@@ -4,6 +4,8 @@ import { api } from '@/api/gasClient'
 import { hasGasUrl } from '@/config'
 import { useCampeonatoOutlet } from '@/pages/campeonato/outletContext'
 import { GroupTableBlock } from '@/pages/campeonato/GroupTableBlock'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 
 export function GruposPage() {
@@ -41,6 +43,17 @@ export function GruposPage() {
 
   return (
     <div className="space-y-8">
+      <Card className="border-primary/10 bg-[linear-gradient(135deg,rgba(37,48,107,0.08),rgba(255,255,255,1))]">
+        <CardHeader>
+          <CardTitle className="text-2xl text-primary">Panorama de grupos</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+          <Badge>{grupos.length} grupo(s)</Badge>
+          <Badge variant="secondary">Genero: {genero}</Badge>
+          <Badge variant="muted">Cada grupo combina tabla, lectura rápida y liderazgo provisional.</Badge>
+        </CardContent>
+      </Card>
+
       {grupos.map((g) => (
         <GroupTableBlock key={g.id} grupoId={g.id} titulo={`${g.nombre} · ${g.categoria}`} />
       ))}
