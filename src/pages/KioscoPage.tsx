@@ -1,19 +1,116 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Activity, Clock, Expand, History, MapPin, Minimize, Sparkles, Timeline, Trophy } from 'lucide-react'
+import { Activity, Clock, Expand, History, MapPin, Minimize, Settings2, Sparkles, Timeline, Trophy } from 'lucide-react'
 import { api } from '@/api/gasClient'
 import { hasGasUrl } from '@/config'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { Partido } from '@/types'
 import { formatPartidoDateKey, formatPartidoDateLabel, formatPartidoTime } from '@/utils/formatDate'
 import { sortMatches } from '@/utils/matches'
 
 const ROTATING_PANELS = ['timeline', 'recent', 'history', 'alerts'] as const
+const KIOSK_SETTINGS_STORAGE_KEY = 'slep_kiosk_settings_v1'
+const SAN_FERNANDO_WEATHER_URL =
+  'https://api.open-meteo.com/v1/forecast?latitude=-34.5852&longitude=-70.9964&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=1&timezone=auto'
 
 type RotatingPanel = (typeof ROTATING_PANELS)[number]
+
+interface KioskSettings {
+  fixedDisciplineId: string
+  rotationSeconds: number
+  autoFullscreen: boolean
+}
+
+interface OpenMeteoResponse {
+  current?: {
+    temperature_2m?: number
+    apparent_temperature?: number
+    weather_code?: number
+    wind_speed_10m?: number
+  }
+  daily?: {
+    temperature_2m_max?: number[]
+    temperature_2m_min?: number[]
+    precipitation_probability_max?: number[]
+  }
+}
+
+function getDefaultKioskSettings(): KioskSettings {
+  return {
+    fixedDisciplineId: 'all',
+    rotationSeconds: 12,
+    autoFullscreen: false,
+  }
+}
+
+function readStoredKioskSettings(): KioskSettings {
+  if (typeof window === 'undefined') return getDefaultKioskSettings()
+
+  try {
+    const raw = window.localStorage.getItem(KIOSK_SETTINGS_STORAGE_KEY)
+    if (!raw) return getDefaultKioskSettings()
+
+    const parsed = JSON.parse(raw) as Partial<KioskSettings>
+    return {
+      fixedDisciplineId: typeof parsed.fixedDisciplineId === 'string' && parsed.fixedDisciplineId ? parsed.fixedDisciplineId : 'all',
+      rotationSeconds: Number(parsed.rotationSeconds) >= 5 ? Number(parsed.rotationSeconds) : 12,
+      autoFullscreen: Boolean(parsed.autoFullscreen),
+    }
+  } catch {
+    return getDefaultKioskSettings()
+  }
+}
+
+function panelLabel(panel: RotatingPanel) {
+  return panel === 'timeline' ? 'Timeline' : panel === 'recent' ? 'Resultados' : panel === 'history' ? 'Historial' : 'Avisos'
+}
+
+function weatherCodeLabel(code: number | undefined) {
+  switch (code) {
+    case 0:
+      return 'Despejado'
+    case 1:
+    case 2:
+    case 3:
+      return 'Parcial nublado'
+    case 45:
+    case 48:
+      return 'Neblina'
+    case 51:
+    case 53:
+    case 55:
+    case 56:
+    case 57:
+    case 61:
+    case 63:
+    case 65:
+    case 66:
+    case 67:
+    case 80:
+    case 81:
+    case 82:
+      return 'Lluvia'
+    case 71:
+    case 73:
+    case 75:
+    case 77:
+    case 85:
+    case 86:
+      return 'Nieve'
+    case 95:
+    case 96:
+    case 99:
+      return 'Tormenta'
+    default:
+      return 'Variable'
+  }
+}
 
 function partidoTimestamp(partido: Partido) {
   return `${formatPartidoDateKey(partido.fecha)}T${formatPartidoTime(partido.hora) || '00:00'}:00`
@@ -94,12 +191,18 @@ export function KioscoPage() {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const previousSnapshotRef = useRef<Map<string, string>>(new Map())
   const highlightTimerRef = useRef<number | null>(null)
-  const [selectedDisciplineId, setSelectedDisciplineId] = useState<string>('all')
+  const autoFullscreenAttemptedRef = useRef(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [kioskSettings, setKioskSettings] = useState<KioskSettings>(() => readStoredKioskSettings())
   const [activePanel, setActivePanel] = useState<RotatingPanel>('timeline')
   const [updatedMatchIds, setUpdatedMatchIds] = useState<string[]>([])
   const [changePulse, setChangePulse] = useState<string | null>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [now, setNow] = useState(() => Date.now())
+
+  useEffect(() => {
+    window.localStorage.setItem(KIOSK_SETTINGS_STORAGE_KEY, JSON.stringify(kioskSettings))
+  }, [kioskSettings])
 
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 1000)
@@ -112,16 +215,25 @@ export function KioscoPage() {
         const index = ROTATING_PANELS.indexOf(current)
         return ROTATING_PANELS[(index + 1) % ROTATING_PANELS.length]
       })
-    }, 12000)
+    }, kioskSettings.rotationSeconds * 1000)
 
     return () => window.clearInterval(id)
-  }, [])
+  }, [kioskSettings.rotationSeconds])
 
   useEffect(() => {
     const onFullscreenChange = () => setIsFullscreen(Boolean(document.fullscreenElement))
     document.addEventListener('fullscreenchange', onFullscreenChange)
     return () => document.removeEventListener('fullscreenchange', onFullscreenChange)
   }, [])
+
+  useEffect(() => {
+    if (!kioskSettings.autoFullscreen) return
+    if (autoFullscreenAttemptedRef.current) return
+    autoFullscreenAttemptedRef.current = true
+
+    if (document.fullscreenElement || !containerRef.current) return
+    void containerRef.current.requestFullscreen().catch(() => undefined)
+  }, [kioskSettings.autoFullscreen])
 
   const campeonatosQ = useQuery({
     queryKey: ['campeonatos'],
@@ -144,9 +256,12 @@ export function KioscoPage() {
 
   const disciplinas = useMemo(() => disciplinasQ.data || [], [disciplinasQ.data])
   const effectiveDisciplineId =
-    selectedDisciplineId !== 'all' && disciplinas.some((disciplina) => disciplina.id === selectedDisciplineId)
-      ? selectedDisciplineId
+    kioskSettings.fixedDisciplineId !== 'all' && disciplinas.some((disciplina) => disciplina.id === kioskSettings.fixedDisciplineId)
+      ? kioskSettings.fixedDisciplineId
       : undefined
+
+  const visibleDisciplineLabel =
+    effectiveDisciplineId ? disciplinas.find((disciplina) => disciplina.id === effectiveDisciplineId)?.nombre || 'Disciplina fija' : 'Todas las disciplinas'
 
   const partidosQ = useQuery({
     queryKey: ['partidos', campeonato?.id, effectiveDisciplineId, 'resumen-kiosco'],
@@ -162,6 +277,17 @@ export function KioscoPage() {
     enabled: hasGasUrl && Boolean(campeonato?.id),
     staleTime: 60 * 1000,
     refetchInterval: 60 * 1000,
+  })
+
+  const weatherQ = useQuery({
+    queryKey: ['weather', 'san-fernando-cl'],
+    queryFn: async () => {
+      const response = await fetch(SAN_FERNANDO_WEATHER_URL)
+      if (!response.ok) throw new Error('No se pudo consultar la meteorología de San Fernando.')
+      return (await response.json()) as OpenMeteoResponse
+    },
+    staleTime: 10 * 60 * 1000,
+    refetchInterval: 15 * 60 * 1000,
   })
 
   const { siguiente, proximos } = useMemo(() => {
@@ -271,6 +397,25 @@ export function KioscoPage() {
   }, [allMatches, partidoDestacado])
 
   const avisosOperativos = useMemo(() => buildOperationalNotes(partidosDeHoy, partidoDestacado), [partidosDeHoy, partidoDestacado])
+  const visibleTodayMatches = useMemo(() => (isFullscreen ? partidosDeHoy.slice(0, 4) : partidosDeHoy.slice(0, 6)), [isFullscreen, partidosDeHoy])
+  const visibleUpcomingMatches = useMemo(() => (isFullscreen ? proximos.slice(0, 4) : proximos), [isFullscreen, proximos])
+  const visibleRecentResults = useMemo(() => (isFullscreen ? resultadosRecientes.slice(0, 4) : resultadosRecientes), [isFullscreen, resultadosRecientes])
+  const weatherSummary = useMemo(() => {
+    const current = weatherQ.data?.current
+    const daily = weatherQ.data?.daily
+
+    if (!current) return null
+
+    return {
+      temperature: Math.round(Number(current.temperature_2m ?? 0)),
+      apparent: Math.round(Number(current.apparent_temperature ?? 0)),
+      wind: Math.round(Number(current.wind_speed_10m ?? 0)),
+      label: weatherCodeLabel(current.weather_code),
+      max: Math.round(Number(daily?.temperature_2m_max?.[0] ?? current.temperature_2m ?? 0)),
+      min: Math.round(Number(daily?.temperature_2m_min?.[0] ?? current.temperature_2m ?? 0)),
+      rain: Math.round(Number(daily?.precipitation_probability_max?.[0] ?? 0)),
+    }
+  }, [weatherQ.data])
 
   const relativeUpdatedText = getRelativeUpdateText(partidosQ.data?.updatedAt, now)
 
@@ -296,44 +441,63 @@ export function KioscoPage() {
       />
       <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(11,18,43,0.88),rgba(37,48,107,0.78),rgba(0,107,185,0.48))]" aria-hidden />
 
-      <div className="relative mx-auto max-w-7xl space-y-6 p-4 md:p-8">
-        <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <div className={`relative mx-auto flex min-h-dvh max-w-[1800px] flex-col ${isFullscreen ? 'gap-3 p-3 md:p-4' : 'gap-6 p-4 md:p-8'}`}>
+        <header className={`flex flex-col ${isFullscreen ? 'gap-3 md:flex-row md:items-start md:justify-between' : 'gap-4 md:flex-row md:items-center md:justify-between'}`}>
           <div className="flex items-center gap-4">
             <div className="grid h-20 w-20 place-items-center rounded-2xl bg-white p-3 shadow-lg">
               <img src="/SLEPCOLCHAGUA.webp" alt="SLEP Colchagua" className="h-full w-full object-contain" />
             </div>
             <div>
               <p className="text-sm font-semibold uppercase tracking-wide text-white/70">Modo kiosco</p>
-              <h1 className="font-display text-4xl font-semibold md:text-5xl">Fixture en vivo</h1>
+              <h1 className={`font-display font-semibold ${isFullscreen ? 'text-3xl md:text-4xl' : 'text-4xl md:text-5xl'}`}>Fixture en vivo</h1>
               <p className="text-white/75">{campeonato?.nombre || 'Campeonato Deportivo SLEP Colchagua'}</p>
               <div className="mt-3 flex flex-wrap gap-2 text-xs text-white/85">
                 <Badge className="border border-white/15 bg-white/10 px-3 py-1 text-white">{relativeUpdatedText}</Badge>
                 {changePulse ? <Badge className="border border-emerald-300/30 bg-emerald-400/15 px-3 py-1 text-emerald-100">{changePulse}</Badge> : null}
+                {weatherSummary ? (
+                  <Badge className="border border-white/15 bg-white/10 px-3 py-1 text-white">
+                    San Fernando, CL · {weatherSummary.temperature}°C · {weatherSummary.label} · Lluvia {weatherSummary.rain}%
+                  </Badge>
+                ) : null}
               </div>
             </div>
           </div>
           <div className="flex flex-col gap-3 md:items-end">
-            <Button
-              type="button"
-              variant="outline"
-              className="border-white/25 bg-white/10 text-white hover:bg-white/15"
-              onClick={toggleFullscreen}
-            >
-              {isFullscreen ? <Minimize className="h-4 w-4" /> : <Expand className="h-4 w-4" />}
-              {isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
-            </Button>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="border-white/25 bg-white/10 text-white hover:bg-white/15"
+                onClick={() => setSettingsOpen(true)}
+              >
+                <Settings2 className="h-4 w-4" />
+                Operador
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="border-white/25 bg-white/10 text-white hover:bg-white/15"
+                onClick={toggleFullscreen}
+              >
+                {isFullscreen ? <Minimize className="h-4 w-4" /> : <Expand className="h-4 w-4" />}
+                {isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
+              </Button>
+            </div>
             <KioscoClock />
           </div>
         </header>
 
-        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-white/15 bg-white/10 p-3 backdrop-blur-sm">
+        <div className={`flex flex-wrap items-center gap-2 rounded-2xl border border-white/15 bg-white/10 backdrop-blur-sm ${isFullscreen ? 'p-2.5' : 'p-3'}`}>
           <Badge className="border border-white/15 bg-white/5 px-3 py-1 text-white">Disciplina visible</Badge>
+          <Badge className="border border-white/15 bg-white/5 px-3 py-1 text-white">{visibleDisciplineLabel}</Badge>
+          <Badge className="border border-white/15 bg-white/5 px-3 py-1 text-white">Rotación {kioskSettings.rotationSeconds}s</Badge>
+          {kioskSettings.autoFullscreen ? <Badge className="border border-white/15 bg-white/5 px-3 py-1 text-white">Fullscreen auto</Badge> : null}
           <Button
             type="button"
             size="sm"
-            variant={selectedDisciplineId === 'all' ? 'secondary' : 'outline'}
-            className={selectedDisciplineId === 'all' ? 'bg-white text-primary' : 'border-white/25 bg-transparent text-white hover:bg-white/10'}
-            onClick={() => setSelectedDisciplineId('all')}
+            variant={kioskSettings.fixedDisciplineId === 'all' ? 'secondary' : 'outline'}
+            className={kioskSettings.fixedDisciplineId === 'all' ? 'bg-white text-primary' : 'border-white/25 bg-transparent text-white hover:bg-white/10'}
+            onClick={() => setKioskSettings((current) => ({ ...current, fixedDisciplineId: 'all' }))}
           >
             Todas
           </Button>
@@ -342,14 +506,35 @@ export function KioscoPage() {
               key={disciplina.id}
               type="button"
               size="sm"
-              variant={selectedDisciplineId === disciplina.id ? 'secondary' : 'outline'}
-              className={selectedDisciplineId === disciplina.id ? 'bg-white text-primary' : 'border-white/25 bg-transparent text-white hover:bg-white/10'}
-              onClick={() => setSelectedDisciplineId(disciplina.id)}
+              variant={kioskSettings.fixedDisciplineId === disciplina.id ? 'secondary' : 'outline'}
+              className={kioskSettings.fixedDisciplineId === disciplina.id ? 'bg-white text-primary' : 'border-white/25 bg-transparent text-white hover:bg-white/10'}
+              onClick={() => setKioskSettings((current) => ({ ...current, fixedDisciplineId: disciplina.id }))}
             >
               {disciplina.nombre}
             </Button>
           ))}
         </div>
+
+        {weatherSummary ? (
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur-sm">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/60">Meteorología</p>
+              <p className="mt-1 text-lg font-semibold text-white">{weatherSummary.label}</p>
+            </div>
+            <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur-sm">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/60">Temperatura</p>
+              <p className="mt-1 text-lg font-semibold text-white">{weatherSummary.temperature}°C</p>
+            </div>
+            <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur-sm">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/60">Máx / mín</p>
+              <p className="mt-1 text-lg font-semibold text-white">{weatherSummary.max}° / {weatherSummary.min}°</p>
+            </div>
+            <div className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 backdrop-blur-sm">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/60">Lluvia / viento</p>
+              <p className="mt-1 text-lg font-semibold text-white">{weatherSummary.rain}% · {weatherSummary.wind} km/h</p>
+            </div>
+          </div>
+        ) : null}
 
         {campeonatosQ.isLoading || partidosQ.isLoading || allMatchesQ.isLoading || disciplinasQ.isLoading ? (
           <Skeleton className="h-96 w-full bg-white/20" />
@@ -362,31 +547,32 @@ export function KioscoPage() {
             </CardHeader>
           </Card>
         ) : (
-          <div className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
-            <Card className="border-white/20 bg-white/95 shadow-2xl">
+          <div className={`grid flex-1 min-h-0 ${isFullscreen ? 'gap-3 xl:grid-cols-12 xl:auto-rows-[minmax(0,1fr)]' : 'gap-6 xl:grid-cols-[1.25fr_0.75fr]'}`}>
+            <Card className={`border-white/20 bg-white/95 shadow-2xl transition-all duration-500 ${partidoEnCurso ? 'ring-4 ring-emerald-300/60 shadow-emerald-200/50' : ''} ${isFullscreen ? 'h-full xl:col-span-7' : ''}`}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 font-display text-3xl text-primary">
                   <Activity className="h-5 w-5" />
                   {partidoEnCurso ? 'Partido en vivo' : 'Próximo partido'}
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className={isFullscreen ? 'space-y-4' : ''}>
                 {partidoDestacado ? (
-                  <div className="space-y-6">
+                  <div className={`transition-all duration-500 ${isFullscreen ? 'space-y-4' : 'space-y-6'} ${partidoEnCurso ? 'rounded-2xl bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.18),transparent_55%)] p-2' : ''}`}>
                     <div className="flex flex-wrap gap-2">
                       <Badge className="px-3 py-1 text-[11px] uppercase tracking-wide">{partidoDestacado.disciplina}</Badge>
                       <Badge>{partidoDestacado.genero}</Badge>
                       <Badge variant="secondary">{partidoDestacado.grupo || partidoDestacado.fase}</Badge>
                       <Badge variant="muted">{partidoDestacado.categoria}</Badge>
                       {updatedMatchIds.includes(partidoDestacado.id) ? <Badge variant="live">Actualizado</Badge> : null}
+                      {partidoEnCurso ? <Badge variant="live">Se prioriza automáticamente</Badge> : null}
                     </div>
-                    <div className="grid gap-6 md:grid-cols-[1fr_auto_1fr] md:items-center">
-                      <p className="font-display text-5xl font-semibold leading-none text-primary xl:text-6xl">
+                    <div className={`grid md:grid-cols-[1fr_auto_1fr] md:items-center ${isFullscreen ? 'gap-4' : 'gap-6'}`}>
+                      <p className={`font-display font-semibold leading-none text-primary transition-all duration-500 ${partidoEnCurso ? 'text-6xl xl:text-7xl' : 'text-5xl xl:text-6xl'}`}>
                         {partidoDestacado.localNombre}
                       </p>
                       <div className="text-center">
                         {partidoDestacado.estado === 'finalizado' || partidoDestacado.estado === 'en_curso' ? (
-                          <div className="font-score text-6xl font-bold tabular-nums text-secondary xl:text-7xl">
+                          <div className={`font-score font-bold tabular-nums text-secondary transition-all duration-500 ${partidoEnCurso ? 'text-7xl xl:text-8xl' : 'text-6xl xl:text-7xl'}`}>
                             {Number(partidoDestacado.marcadorLocal || 0)}:{Number(partidoDestacado.marcadorVisita || 0)}
                           </div>
                         ) : (
@@ -396,7 +582,7 @@ export function KioscoPage() {
                           {formatPartidoDateKey(partidoDestacado.fecha)} · {formatPartidoTime(partidoDestacado.hora)}
                         </p>
                       </div>
-                      <p className="font-display text-5xl font-semibold leading-none text-primary md:text-right xl:text-6xl">
+                      <p className={`font-display font-semibold leading-none text-primary transition-all duration-500 md:text-right ${partidoEnCurso ? 'text-6xl xl:text-7xl' : 'text-5xl xl:text-6xl'}`}>
                         {partidoDestacado.visitaNombre}
                       </p>
                     </div>
@@ -422,17 +608,17 @@ export function KioscoPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-white/20 bg-white/95 shadow-2xl">
+            <Card className={`border-white/20 bg-white/95 shadow-2xl ${isFullscreen ? 'h-full xl:col-span-5' : ''}`}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 font-display text-3xl text-primary">
                   <Clock className="h-5 w-5" />
                   Partidos de hoy
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
-                {partidosDeHoy.length ? (
-                  partidosDeHoy.slice(0, 6).map((p) => (
-                    <div key={p.id} className={`rounded-xl border border-primary/10 bg-surface p-4 transition ${updatedMatchIds.includes(p.id) ? 'ring-2 ring-emerald-300/70 shadow-lg shadow-emerald-200/40' : ''}`}>
+              <CardContent className={`space-y-3 ${isFullscreen ? 'min-h-0' : ''}`}>
+                {visibleTodayMatches.length ? (
+                  visibleTodayMatches.map((p) => (
+                    <div key={p.id} className={`rounded-xl border border-primary/10 bg-surface transition ${updatedMatchIds.includes(p.id) ? 'ring-2 ring-emerald-300/70 shadow-lg shadow-emerald-200/40' : ''} ${isFullscreen ? 'p-3' : 'p-4'}`}>
                       <div className="mb-1 flex items-center justify-between gap-2">
                         <span className="font-score text-2xl font-bold text-primary">{formatPartidoTime(p.hora)}</span>
                         <Badge variant={p.estado === 'en_curso' ? 'live' : 'default'}>{p.estado}</Badge>
@@ -453,7 +639,7 @@ export function KioscoPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-white/20 bg-white/95 shadow-2xl xl:col-span-2">
+            <Card className={`border-white/20 bg-white/95 shadow-2xl ${isFullscreen ? 'h-full xl:col-span-7' : 'xl:col-span-2'}`}>
               <CardHeader>
                 <CardTitle className="font-display text-3xl text-primary">Próximos encuentros</CardTitle>
                 <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
@@ -467,23 +653,24 @@ export function KioscoPage() {
                         variant={activePanel === panel ? 'secondary' : 'outline'}
                         onClick={() => setActivePanel(panel)}
                       >
-                        {panel === 'timeline' ? 'Timeline' : panel === 'recent' ? 'Resultados' : panel === 'history' ? 'Historial' : 'Avisos'}
+                        {panelLabel(panel)}
                       </Button>
                     ))}
                   </div>
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className={`overflow-hidden ${isFullscreen ? 'min-h-0' : ''}`}>
+                <div key={activePanel} className="animate-in fade-in slide-in-from-bottom-3 duration-500">
                 {activePanel === 'timeline' ? (
                   <div className="space-y-4">
                     <div className="flex items-center gap-2 text-primary">
                       <Timeline className="h-5 w-5" />
                       <p className="text-sm font-semibold">Línea de tiempo de hoy</p>
                     </div>
-                    <div className="flex gap-3 overflow-x-auto pb-2">
-                      {partidosDeHoy.length ? (
-                        partidosDeHoy.map((p) => (
-                          <div key={p.id} className={`min-w-[260px] rounded-2xl border border-primary/10 bg-white p-4 ${updatedMatchIds.includes(p.id) ? 'ring-2 ring-emerald-300/70' : ''}`}>
+                    <div className={isFullscreen ? 'grid gap-3 md:grid-cols-2 xl:grid-cols-4' : 'flex gap-3 overflow-x-auto pb-2'}>
+                      {visibleTodayMatches.length ? (
+                        visibleTodayMatches.map((p) => (
+                          <div key={p.id} className={`rounded-2xl border border-primary/10 bg-white ${isFullscreen ? 'p-3' : 'min-w-[260px] p-4'} ${updatedMatchIds.includes(p.id) ? 'ring-2 ring-emerald-300/70' : ''}`}>
                             <p className="font-score text-lg font-bold text-secondary">{formatPartidoTime(p.hora)}</p>
                             <div className="mt-2 flex flex-wrap gap-2">
                               <Badge className="px-2.5 py-1 text-[11px] uppercase tracking-wide">{p.disciplina}</Badge>
@@ -508,9 +695,9 @@ export function KioscoPage() {
                       <p className="text-sm font-semibold">Últimos resultados registrados</p>
                     </div>
                     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                      {resultadosRecientes.length ? (
-                        resultadosRecientes.map((p) => (
-                          <div key={p.id} className={`rounded-xl border border-primary/10 bg-white p-4 ${updatedMatchIds.includes(p.id) ? 'ring-2 ring-emerald-300/70' : ''}`}>
+                      {visibleRecentResults.length ? (
+                        visibleRecentResults.map((p) => (
+                          <div key={p.id} className={`rounded-xl border border-primary/10 bg-white ${isFullscreen ? 'p-3' : 'p-4'} ${updatedMatchIds.includes(p.id) ? 'ring-2 ring-emerald-300/70' : ''}`}>
                             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary/60">{formatPartidoDateLabel(p.fecha)}</p>
                             <div className="mt-2 flex flex-wrap gap-2">
                               <Badge className="px-2.5 py-1 text-[11px] uppercase tracking-wide">{p.disciplina}</Badge>
@@ -579,20 +766,21 @@ export function KioscoPage() {
                       )}
                     </div>
                     <div className="rounded-2xl border border-dashed border-primary/20 bg-primary/5 p-4 text-sm text-muted">
-                      El bloque meteorológico no se activó porque hoy la app no tiene una fuente externa de clima. Si quieres eso en producción, hay que conectar una API adicional.
+                      Meteorología gratuita activa con Open-Meteo para San Fernando, Chile. Si luego quieres pronóstico por sede exacta, solo hay que cambiar latitud y longitud.
                     </div>
                   </div>
                 ) : null}
+                </div>
               </CardContent>
             </Card>
 
-            <Card className="border-white/20 bg-white/95 shadow-2xl xl:col-span-2">
+            <Card className={`border-white/20 bg-white/95 shadow-2xl ${isFullscreen ? 'h-full xl:col-span-5' : 'xl:col-span-2'}`}>
               <CardHeader>
                 <CardTitle className="font-display text-3xl text-primary">Próximos encuentros</CardTitle>
               </CardHeader>
-              <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                {proximos.length ? (
-                  proximos.map((p) => (
+              <CardContent className={`grid gap-3 ${isFullscreen ? 'md:grid-cols-2 xl:grid-cols-2' : 'md:grid-cols-2 xl:grid-cols-4'}`}>
+                {visibleUpcomingMatches.length ? (
+                  visibleUpcomingMatches.map((p) => (
                     <div key={p.id} className={`rounded-xl border border-primary/10 bg-white p-3 ${updatedMatchIds.includes(p.id) ? 'ring-2 ring-emerald-300/70' : ''}`}>
                       <p className="font-score text-sm font-bold text-secondary">
                         {formatPartidoDateKey(p.fecha)} · {formatPartidoTime(p.hora)}
@@ -615,6 +803,70 @@ export function KioscoPage() {
           </div>
         )}
       </div>
+
+      <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Configuración del operador</DialogTitle>
+            <DialogDescription>
+              Fija una disciplina, ajusta la rotación del carrusel y define si el kiosco debe intentar abrir en pantalla completa.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="kiosk-discipline">Disciplina fija</Label>
+              <select
+                id="kiosk-discipline"
+                className="h-10 w-full rounded-lg border border-black/10 bg-white px-3 text-sm"
+                value={kioskSettings.fixedDisciplineId}
+                onChange={(e) => setKioskSettings((current) => ({ ...current, fixedDisciplineId: e.target.value }))}
+              >
+                <option value="all">Todas las disciplinas</option>
+                {disciplinas.map((disciplina) => (
+                  <option key={disciplina.id} value={disciplina.id}>
+                    {disciplina.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="kiosk-rotation">Rotación del carrusel (segundos)</Label>
+              <Input
+                id="kiosk-rotation"
+                type="number"
+                min={5}
+                max={60}
+                value={kioskSettings.rotationSeconds}
+                onChange={(e) => {
+                  const next = Math.min(60, Math.max(5, Number(e.target.value || 12)))
+                  setKioskSettings((current) => ({ ...current, rotationSeconds: next }))
+                }}
+              />
+            </div>
+
+            <label className="flex items-center justify-between gap-3 rounded-xl border border-primary/10 bg-primary/5 px-4 py-3 text-sm font-medium text-primary">
+              <span>Intentar pantalla completa al abrir</span>
+              <input
+                type="checkbox"
+                className="h-4 w-4 accent-[#25306B]"
+                checked={kioskSettings.autoFullscreen}
+                onChange={(e) => setKioskSettings((current) => ({ ...current, autoFullscreen: e.target.checked }))}
+              />
+            </label>
+
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setKioskSettings(getDefaultKioskSettings())}>
+                Restablecer
+              </Button>
+              <Button type="button" onClick={() => setSettingsOpen(false)}>
+                Cerrar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
