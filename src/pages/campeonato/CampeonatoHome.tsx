@@ -1,4 +1,4 @@
-import { Link, useParams } from 'react-router-dom'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/api/gasClient'
 import { hasGasUrl } from '@/config'
@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 
 export function CampeonatoHome() {
   const { id } = useParams()
+  const location = useLocation()
   const { campeonatoId, disciplinaId } = useCampeonatoOutlet()
 
   const campeonatoQ = useQuery({
@@ -56,13 +57,13 @@ export function CampeonatoHome() {
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
           <Button asChild>
-            <Link to={`/campeonatos/${campeonatoId}/calendario`}>Ver calendario</Link>
+            <Link to={{ pathname: `/campeonatos/${campeonatoId}/calendario`, search: location.search }}>Ver calendario</Link>
           </Button>
           <Button asChild variant="outline">
-            <Link to={`/campeonatos/${campeonatoId}/grupos`}>Ver grupos</Link>
+            <Link to={{ pathname: `/campeonatos/${campeonatoId}/grupos`, search: location.search }}>Ver grupos</Link>
           </Button>
           <Button asChild variant="outline">
-            <Link to={`/campeonatos/${campeonatoId}/partidos`}>Filtrar partidos</Link>
+            <Link to={{ pathname: `/campeonatos/${campeonatoId}/partidos`, search: location.search }}>Filtrar partidos</Link>
           </Button>
         </CardContent>
       </Card>

@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { api } from '@/api/gasClient'
 import { hasGasUrl } from '@/config'
 import { DisciplineFilter } from '@/components/DisciplineFilter'
+import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 
@@ -28,6 +29,8 @@ export function CampeonatoLayout() {
 
   const disciplinas = disciplinasQ.data || []
   const disciplinaId = params.get('disciplinaId') || disciplinas[0]?.id || ''
+  const disciplinaActual = disciplinas.find((disciplina) => disciplina.id === disciplinaId) || disciplinas[0] || null
+  const currentSearch = params.toString()
 
   const categoriasDisponibles = useMemo(() => {
     const d = disciplinas.find((x) => x.id === disciplinaId)
@@ -43,7 +46,10 @@ export function CampeonatoLayout() {
     const next = new URLSearchParams(params)
     let changed = false
 
-    if (!next.get('disciplinaId')) {
+    const currentDisciplinaId = next.get('disciplinaId')
+    const disciplinaValida = currentDisciplinaId && disciplinas.some((disciplina) => disciplina.id === currentDisciplinaId)
+
+    if (!disciplinaValida) {
       next.set('disciplinaId', disciplinas[0].id)
       changed = true
     }
@@ -95,9 +101,16 @@ export function CampeonatoLayout() {
             <div className="space-y-1">
               <p className="text-xs font-semibold uppercase tracking-wide text-white/70">Campeonato</p>
               <h1 className="font-display text-3xl font-semibold">{c?.nombre}</h1>
-              <p className="text-sm text-white/75">
-                {c?.año} · {c?.estado}
-              </p>
+              <div className="flex flex-wrap items-center gap-2 text-sm text-white/75">
+                <p>
+                  {c?.año} · {c?.estado}
+                </p>
+                {disciplinaActual ? (
+                  <Badge className="border border-white/20 bg-white/15 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white backdrop-blur-sm">
+                    {disciplinaActual.nombre}
+                  </Badge>
+                ) : null}
+              </div>
             </div>
           </div>
           <div className="rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white ring-1 ring-white/15">
@@ -108,7 +121,7 @@ export function CampeonatoLayout() {
 
       <div className="flex flex-wrap gap-2 rounded-xl border border-primary/10 bg-white p-2 shadow-sm">
         <NavLink
-          to={`/campeonatos/${id}`}
+          to={{ pathname: `/campeonatos/${id}`, search: currentSearch ? `?${currentSearch}` : '' }}
           end
           className={({ isActive }) =>
             cn(
@@ -129,7 +142,7 @@ export function CampeonatoLayout() {
         ).map(([path, label]) => (
           <NavLink
             key={path}
-            to={`/campeonatos/${id}/${path}`}
+            to={{ pathname: `/campeonatos/${id}/${path}`, search: currentSearch ? `?${currentSearch}` : '' }}
             className={({ isActive }) =>
               cn(
                 'rounded-lg px-3 py-2 text-sm font-semibold',

@@ -93,6 +93,7 @@ export function KioscoPage() {
                 {siguiente ? (
                   <div className="space-y-6">
                     <div className="flex flex-wrap gap-2">
+                      <Badge className="px-3 py-1 text-[11px] uppercase tracking-wide">{siguiente.disciplina}</Badge>
                       <Badge>{siguiente.genero}</Badge>
                       <Badge variant="secondary">{siguiente.grupo || siguiente.fase}</Badge>
                       <Badge variant="muted">{siguiente.categoria}</Badge>
@@ -137,6 +138,10 @@ export function KioscoPage() {
                         <span className="font-score text-2xl font-bold text-primary">{formatPartidoTime(p.hora)}</span>
                         <Badge variant={p.estado === 'en_curso' ? 'live' : 'default'}>{p.estado}</Badge>
                       </div>
+                      <div className="mb-2 flex flex-wrap gap-2">
+                        <Badge className="px-2.5 py-1 text-[11px] uppercase tracking-wide">{p.disciplina}</Badge>
+                        <Badge variant="muted">{p.categoria}</Badge>
+                      </div>
                       <p className="text-lg font-semibold text-primary">
                         {p.localNombre} vs {p.visitaNombre}
                       </p>
@@ -159,6 +164,10 @@ export function KioscoPage() {
                     <p className="font-score text-sm font-bold text-secondary">
                       {formatPartidoDateKey(p.fecha)} · {formatPartidoTime(p.hora)}
                     </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Badge className="px-2.5 py-1 text-[11px] uppercase tracking-wide">{p.disciplina}</Badge>
+                      <Badge variant="muted">{p.categoria}</Badge>
+                    </div>
                     <p className="mt-1 line-clamp-2 text-sm font-semibold text-primary">
                       {p.localNombre} vs {p.visitaNombre}
                     </p>

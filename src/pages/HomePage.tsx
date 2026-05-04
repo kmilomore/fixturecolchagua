@@ -173,6 +173,7 @@ export function HomePage() {
                 ) : siguiente ? (
                   <div className="space-y-4">
                     <div className="flex flex-wrap gap-2">
+                      <Badge className="px-3 py-1 text-[11px] uppercase tracking-wide">{siguiente.disciplina}</Badge>
                       <Badge>{siguiente.genero}</Badge>
                       <Badge variant="secondary">{siguiente.grupo || siguiente.fase}</Badge>
                       <Badge variant="muted">{siguiente.categoria}</Badge>

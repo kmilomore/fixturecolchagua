@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import type { Disciplina } from '@/types'
+import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -15,6 +16,7 @@ export function DisciplineFilter({ disciplinas, categoriasDisponibles, className
   const [params, setParams] = useSearchParams()
 
   const disciplinaId = params.get('disciplinaId') || disciplinas[0]?.id || ''
+  const disciplinaActual = disciplinas.find((disciplina) => disciplina.id === disciplinaId) || disciplinas[0] || null
   const genero = (params.get('genero') as 'Damas' | 'Varones' | null) || 'Damas'
   const categoria = params.get('categoria') || categoriasDisponibles[0] || ''
   const fase = params.get('fase') || 'grupos'
@@ -41,7 +43,11 @@ export function DisciplineFilter({ disciplinas, categoriasDisponibles, className
       >
         <TabsList className="h-9 w-auto justify-start bg-transparent p-0">
           {disciplinas.map((d) => (
-            <TabsTrigger key={d.id} value={d.id}>
+            <TabsTrigger
+              key={d.id}
+              value={d.id}
+              className="border border-primary/10 bg-white text-primary/75 data-[state=active]:border-primary data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-md"
+            >
               {d.nombre}
             </TabsTrigger>
           ))}
@@ -56,6 +62,14 @@ export function DisciplineFilter({ disciplinas, categoriasDisponibles, className
 
   return (
     <div className={cn('rounded-xl border border-primary/10 bg-white p-2 shadow-sm', className)}>
+      <div className="flex items-center justify-between gap-3 border-b border-primary/10 px-1 pb-2">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary/55">Disciplina activa</p>
+          <p className="text-sm font-semibold text-primary">{disciplinaActual?.nombre || 'Sin disciplina'}</p>
+        </div>
+        {disciplinaActual ? <Badge className="px-3 py-1 text-[11px] uppercase tracking-wide">{disciplinaActual.nombre}</Badge> : null}
+      </div>
+
       <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap pb-1">
         {disciplinaTabs}
 
