@@ -64,6 +64,7 @@ FIXTURE 2.0/
 
 Además de este contexto general, existen documentos específicos para módulos con comportamiento propio:
 
+- `CAMPEONATOS_CONTEXT.MD`: documentación detallada del módulo campeonatos, navegación interna, layout contextual, filtros persistidos, grupos, fases y partidos.
 - `KIOKO_CONTEX.MD`: documentación detallada del módulo kiosco, su consumo de datos, fullscreen, operador y meteorología.
 - `KIOKO_CONTEX.MD` debe considerarse la fuente de verdad para fullscreen del kiosco, selector por escuela, compactación por resolución y fallback meteorológico.
 - `ADMIN_CONTEX.MD`: documentación detallada del módulo admin, autenticación, sesión, permisos operativos y gestión de partidos.
