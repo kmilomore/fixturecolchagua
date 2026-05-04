@@ -16,8 +16,7 @@ import { sortMatches } from '@/utils/matches'
 
 const ROTATING_PANELS = ['timeline', 'recent', 'history', 'alerts'] as const
 const KIOSK_SETTINGS_STORAGE_KEY = 'slep_kiosk_settings_v1'
-const SAN_FERNANDO_WEATHER_URL =
-  'https://api.open-meteo.com/v1/forecast?latitude=-34.5852&longitude=-70.9964&current=temperature_2m,apparent_temperature,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=1&timezone=auto'
+const SAN_FERNANDO_WEATHER_URL = '/api/weather'
 
 type RotatingPanel = (typeof ROTATING_PANELS)[number]
 
@@ -209,6 +208,10 @@ export function KioscoPage() {
   const [changePulse, setChangePulse] = useState<string | null>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [now, setNow] = useState(() => Date.now())
+  const [viewportSize, setViewportSize] = useState(() => ({
+    width: typeof window === 'undefined' ? 1920 : window.innerWidth,
+    height: typeof window === 'undefined' ? 1080 : window.innerHeight,
+  }))
 
   useEffect(() => {
     window.localStorage.setItem(KIOSK_SETTINGS_STORAGE_KEY, JSON.stringify(kioskSettings))
@@ -217,6 +220,16 @@ export function KioscoPage() {
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 1000)
     return () => window.clearInterval(id)
+  }, [])
+
+  useEffect(() => {
+    const updateViewportSize = () => {
+      setViewportSize({ width: window.innerWidth, height: window.innerHeight })
+    }
+
+    updateViewportSize()
+    window.addEventListener('resize', updateViewportSize)
+    return () => window.removeEventListener('resize', updateViewportSize)
   }, [])
 
   useEffect(() => {
@@ -407,9 +420,30 @@ export function KioscoPage() {
   }, [allMatches, partidoDestacado])
 
   const avisosOperativos = useMemo(() => buildOperationalNotes(partidosDeHoy, partidoDestacado), [partidosDeHoy, partidoDestacado])
-  const visibleTodayMatches = useMemo(() => (isFullscreen ? partidosDeHoy.slice(0, 4) : partidosDeHoy.slice(0, 6)), [isFullscreen, partidosDeHoy])
-  const visibleUpcomingMatches = useMemo(() => (isFullscreen ? proximos.slice(0, 4) : proximos), [isFullscreen, proximos])
-  const visibleRecentResults = useMemo(() => (isFullscreen ? resultadosRecientes.slice(0, 4) : resultadosRecientes), [isFullscreen, resultadosRecientes])
+  const isCompactFullscreen = isFullscreen && (viewportSize.height < 940 || viewportSize.width < 1600)
+  const isUltraCompactFullscreen = isFullscreen && (viewportSize.height < 820 || viewportSize.width < 1366)
+
+  const visibleTodayMatches = useMemo(() => {
+    if (!isFullscreen) return partidosDeHoy.slice(0, 6)
+    if (isUltraCompactFullscreen) return partidosDeHoy.slice(0, 3)
+    if (isCompactFullscreen) return partidosDeHoy.slice(0, 4)
+    return partidosDeHoy.slice(0, 5)
+  }, [isCompactFullscreen, isFullscreen, isUltraCompactFullscreen, partidosDeHoy])
+
+  const visibleUpcomingMatches = useMemo(() => {
+    if (!isFullscreen) return proximos
+    if (isUltraCompactFullscreen) return proximos.slice(0, 2)
+    if (isCompactFullscreen) return proximos.slice(0, 3)
+    return proximos.slice(0, 4)
+  }, [isCompactFullscreen, isFullscreen, isUltraCompactFullscreen, proximos])
+
+  const visibleRecentResults = useMemo(() => {
+    if (!isFullscreen) return resultadosRecientes
+    if (isUltraCompactFullscreen) return resultadosRecientes.slice(0, 2)
+    if (isCompactFullscreen) return resultadosRecientes.slice(0, 3)
+    return resultadosRecientes.slice(0, 4)
+  }, [isCompactFullscreen, isFullscreen, isUltraCompactFullscreen, resultadosRecientes])
+
   const weatherSummary = useMemo<WeatherSummary | null>(() => {
     const current = weatherQ.data?.current
     const daily = weatherQ.data?.daily
@@ -455,6 +489,42 @@ export function KioscoPage() {
         { label: 'Lluvia / viento', value: 'Sin dato' },
       ]
 
+  const fullscreenPaddingClass = isUltraCompactFullscreen
+    ? 'max-w-[1880px] gap-2 px-[clamp(10px,1.3vw,18px)] py-[clamp(10px,1.3vh,16px)]'
+    : isCompactFullscreen
+      ? 'max-w-[1900px] gap-3 px-[clamp(12px,1.5vw,22px)] py-[clamp(12px,1.5vh,20px)]'
+      : 'max-w-[1920px] gap-3 px-[clamp(16px,1.8vw,28px)] py-[clamp(14px,1.8vh,24px)]'
+
+  const heroTitleClass = isUltraCompactFullscreen
+    ? 'text-2xl md:text-3xl'
+    : isCompactFullscreen
+      ? 'text-3xl md:text-[2.15rem]'
+      : 'text-3xl md:text-4xl'
+
+  const heroTeamClass = isUltraCompactFullscreen
+    ? 'text-4xl xl:text-5xl'
+    : isCompactFullscreen
+      ? 'text-5xl xl:text-[3.4rem]'
+      : 'text-5xl xl:text-6xl'
+
+  const liveHeroTeamClass = isUltraCompactFullscreen
+    ? 'text-5xl xl:text-6xl'
+    : isCompactFullscreen
+      ? 'text-[3.4rem] xl:text-[4rem]'
+      : 'text-6xl xl:text-7xl'
+
+  const scoreClass = isUltraCompactFullscreen
+    ? 'text-5xl xl:text-6xl'
+    : isCompactFullscreen
+      ? 'text-6xl xl:text-[4.5rem]'
+      : 'text-6xl xl:text-7xl'
+
+  const liveScoreClass = isUltraCompactFullscreen
+    ? 'text-6xl xl:text-7xl'
+    : isCompactFullscreen
+      ? 'text-[4.5rem] xl:text-[5rem]'
+      : 'text-7xl xl:text-8xl'
+
   const relativeUpdatedText = getRelativeUpdateText(partidosQ.data?.updatedAt, now)
 
   const toggleFullscreen = async () => {
@@ -471,7 +541,7 @@ export function KioscoPage() {
   if (!hasGasUrl) return <p className="p-6 text-muted">Configura VITE_GAS_URL.</p>
 
   return (
-    <div ref={containerRef} className="relative min-h-dvh overflow-hidden bg-slate-950 text-white">
+    <div ref={containerRef} className="relative min-h-dvh overflow-x-hidden overflow-y-auto bg-slate-950 text-white">
       <div
         className="absolute inset-0 bg-cover bg-center bg-no-repeat"
         style={{ backgroundImage: "url('/auth.webp')" }}
@@ -482,18 +552,18 @@ export function KioscoPage() {
       <div
         className={`relative mx-auto flex min-h-dvh w-full flex-col ${
           isFullscreen
-            ? 'max-w-[1920px] gap-3 px-[clamp(12px,1.8vw,28px)] py-[clamp(12px,1.8vh,24px)]'
+            ? fullscreenPaddingClass
             : 'max-w-[1800px] gap-6 p-4 md:p-8'
         }`}
       >
         <header className={`flex flex-col ${isFullscreen ? 'gap-3 md:flex-row md:items-start md:justify-between' : 'gap-4 md:flex-row md:items-center md:justify-between'}`}>
           <div className="flex items-center gap-4">
-            <div className="grid h-20 w-20 place-items-center rounded-2xl bg-white p-3 shadow-lg">
+            <div className={`grid place-items-center rounded-2xl bg-white p-3 shadow-lg ${isUltraCompactFullscreen ? 'h-14 w-14' : isCompactFullscreen ? 'h-16 w-16' : 'h-20 w-20'}`}>
               <img src="/SLEPCOLCHAGUA.webp" alt="SLEP Colchagua" className="h-full w-full object-contain" />
             </div>
             <div>
               <p className="text-sm font-semibold uppercase tracking-wide text-white/70">Modo kiosco</p>
-              <h1 className={`font-display font-semibold ${isFullscreen ? 'text-3xl md:text-4xl' : 'text-4xl md:text-5xl'}`}>Fixture en vivo</h1>
+              <h1 className={`font-display font-semibold ${isFullscreen ? heroTitleClass : 'text-4xl md:text-5xl'}`}>Fixture en vivo</h1>
               <p className="text-white/75">{campeonato?.nombre || 'Campeonato Deportivo SLEP Colchagua'}</p>
               <div className="mt-3 flex flex-wrap gap-2 text-xs text-white/85">
                 <Badge className="border border-white/15 bg-white/10 px-3 py-1 text-white">{relativeUpdatedText}</Badge>
@@ -529,7 +599,7 @@ export function KioscoPage() {
           </div>
         </header>
 
-        <div className={`flex flex-wrap items-center gap-2 rounded-2xl border border-white/15 bg-white/10 backdrop-blur-sm ${isFullscreen ? 'p-2.5' : 'p-3'}`}>
+        <div className={`flex flex-wrap items-center gap-2 rounded-2xl border border-white/15 bg-white/10 backdrop-blur-sm ${isUltraCompactFullscreen ? 'p-2' : isFullscreen ? 'p-2.5' : 'p-3'}`}>
           <Badge className="border border-white/15 bg-white/5 px-3 py-1 text-white">Disciplina visible</Badge>
           <Badge className="border border-white/15 bg-white/5 px-3 py-1 text-white">{visibleDisciplineLabel}</Badge>
           <Badge className="border border-white/15 bg-white/5 px-3 py-1 text-white">Rotación {kioskSettings.rotationSeconds}s</Badge>
@@ -557,7 +627,7 @@ export function KioscoPage() {
           ))}
         </div>
 
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div className={`grid gap-3 ${isUltraCompactFullscreen ? 'grid-cols-2 xl:grid-cols-4' : 'grid-cols-2 md:grid-cols-4'}`}>
           {weatherCards.map((item) => (
             <div
               key={item.label}
@@ -566,7 +636,7 @@ export function KioscoPage() {
               }`}
             >
               <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/60">{item.label}</p>
-              <p className="mt-1 text-lg font-semibold text-white">{item.value}</p>
+              <p className={`mt-1 font-semibold text-white ${isUltraCompactFullscreen ? 'text-base' : 'text-lg'}`}>{item.value}</p>
             </div>
           ))}
         </div>
@@ -582,17 +652,17 @@ export function KioscoPage() {
             </CardHeader>
           </Card>
         ) : (
-          <div className={`grid flex-1 min-h-0 ${isFullscreen ? 'gap-3 xl:grid-cols-12 xl:auto-rows-[minmax(0,1fr)] 2xl:gap-4' : 'gap-6 xl:grid-cols-[1.25fr_0.75fr]'}`}>
-            <Card className={`border-white/20 bg-white/95 shadow-2xl transition-all duration-500 ${partidoEnCurso ? 'ring-4 ring-emerald-300/60 shadow-emerald-200/50' : ''} ${isFullscreen ? 'h-full xl:col-span-7' : ''}`}>
+          <div className={`grid min-h-0 content-start ${isFullscreen ? 'gap-3 xl:grid-cols-12 2xl:gap-4' : 'gap-6 xl:grid-cols-[1.25fr_0.75fr]'}`}>
+            <Card className={`self-start border-white/20 bg-white/95 shadow-2xl transition-all duration-500 ${partidoEnCurso ? 'ring-4 ring-emerald-300/60 shadow-emerald-200/50' : ''} ${isFullscreen ? 'xl:col-span-7' : ''}`}>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 font-display text-3xl text-primary">
+                <CardTitle className={`flex items-center gap-2 font-display text-primary ${isUltraCompactFullscreen ? 'text-2xl' : 'text-3xl'}`}>
                   <Activity className="h-5 w-5" />
                   {partidoEnCurso ? 'Partido en vivo' : 'Próximo partido'}
                 </CardTitle>
               </CardHeader>
-              <CardContent className={isFullscreen ? 'space-y-4' : ''}>
+              <CardContent className={isFullscreen ? (isUltraCompactFullscreen ? 'space-y-3' : 'space-y-4') : ''}>
                 {partidoDestacado ? (
-                  <div className={`transition-all duration-500 ${isFullscreen ? 'space-y-4' : 'space-y-6'} ${partidoEnCurso ? 'rounded-2xl bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.18),transparent_55%)] p-2' : ''}`}>
+                  <div className={`transition-all duration-500 ${isUltraCompactFullscreen ? 'space-y-3' : isFullscreen ? 'space-y-4' : 'space-y-6'} ${partidoEnCurso ? 'rounded-2xl bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.18),transparent_55%)] p-2' : ''}`}>
                     <div className="flex flex-wrap gap-2">
                       <Badge className="px-3 py-1 text-[11px] uppercase tracking-wide">{partidoDestacado.disciplina}</Badge>
                       <Badge>{partidoDestacado.genero}</Badge>
@@ -601,34 +671,34 @@ export function KioscoPage() {
                       {updatedMatchIds.includes(partidoDestacado.id) ? <Badge variant="live">Actualizado</Badge> : null}
                       {partidoEnCurso ? <Badge variant="live">Se prioriza automáticamente</Badge> : null}
                     </div>
-                    <div className={`grid md:grid-cols-[1fr_auto_1fr] md:items-center ${isFullscreen ? 'gap-4' : 'gap-6'}`}>
-                      <p className={`font-display font-semibold leading-none text-primary transition-all duration-500 ${partidoEnCurso ? 'text-6xl xl:text-7xl' : 'text-5xl xl:text-6xl'}`}>
+                    <div className={`grid md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-center ${isUltraCompactFullscreen ? 'gap-3' : isFullscreen ? 'gap-4' : 'gap-6'}`}>
+                      <p className={`line-clamp-2 font-display font-semibold leading-none text-primary transition-all duration-500 ${partidoEnCurso ? liveHeroTeamClass : heroTeamClass}`}>
                         {partidoDestacado.localNombre}
                       </p>
                       <div className="text-center">
                         {partidoDestacado.estado === 'finalizado' || partidoDestacado.estado === 'en_curso' ? (
-                          <div className={`font-score font-bold tabular-nums text-secondary transition-all duration-500 ${partidoEnCurso ? 'text-7xl xl:text-8xl' : 'text-6xl xl:text-7xl'}`}>
+                          <div className={`font-score font-bold tabular-nums text-secondary transition-all duration-500 ${partidoEnCurso ? liveScoreClass : scoreClass}`}>
                             {Number(partidoDestacado.marcadorLocal || 0)}:{Number(partidoDestacado.marcadorVisita || 0)}
                           </div>
                         ) : (
-                          <p className="font-display text-6xl font-bold text-secondary xl:text-7xl">VS</p>
+                          <p className={`font-display font-bold text-secondary ${scoreClass}`}>VS</p>
                         )}
-                        <p className="mt-2 text-base font-semibold text-muted">
+                        <p className={`mt-2 font-semibold text-muted ${isUltraCompactFullscreen ? 'text-sm' : 'text-base'}`}>
                           {formatPartidoDateKey(partidoDestacado.fecha)} · {formatPartidoTime(partidoDestacado.hora)}
                         </p>
                       </div>
-                      <p className={`font-display font-semibold leading-none text-primary transition-all duration-500 md:text-right ${partidoEnCurso ? 'text-6xl xl:text-7xl' : 'text-5xl xl:text-6xl'}`}>
+                      <p className={`line-clamp-2 font-display font-semibold leading-none text-primary transition-all duration-500 md:text-right ${partidoEnCurso ? liveHeroTeamClass : heroTeamClass}`}>
                         {partidoDestacado.visitaNombre}
                       </p>
                     </div>
-                    <p className="flex items-center gap-2 text-lg font-semibold text-muted">
+                    <p className={`flex items-center gap-2 font-semibold text-muted ${isUltraCompactFullscreen ? 'text-base' : 'text-lg'}`}>
                       <MapPin className="h-5 w-5" />
                       {partidoDestacado.lugar}
                     </p>
                     {proximoMismoRecinto ? (
-                      <div className="rounded-2xl border border-primary/10 bg-primary/5 p-4">
+                      <div className={`rounded-2xl border border-primary/10 bg-primary/5 ${isUltraCompactFullscreen ? 'p-3' : 'p-4'}`}>
                         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary/70">Después de este partido</p>
-                        <p className="mt-1 text-lg font-semibold text-primary">
+                        <p className={`mt-1 font-semibold text-primary ${isUltraCompactFullscreen ? 'text-base' : 'text-lg'}`}>
                           {proximoMismoRecinto.localNombre} vs {proximoMismoRecinto.visitaNombre}
                         </p>
                         <p className="text-sm text-muted">
@@ -643,27 +713,27 @@ export function KioscoPage() {
               </CardContent>
             </Card>
 
-            <Card className={`border-white/20 bg-white/95 shadow-2xl ${isFullscreen ? 'h-full xl:col-span-5' : ''}`}>
+            <Card className={`self-start border-white/20 bg-white/95 shadow-2xl ${isFullscreen ? 'xl:col-span-5' : ''}`}>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2 font-display text-3xl text-primary">
+                <CardTitle className={`flex items-center gap-2 font-display text-primary ${isUltraCompactFullscreen ? 'text-2xl' : 'text-3xl'}`}>
                   <Clock className="h-5 w-5" />
                   Partidos de hoy
                 </CardTitle>
               </CardHeader>
-              <CardContent className={`space-y-3 ${isFullscreen ? 'min-h-0 overflow-hidden' : ''}`}>
+              <CardContent className={`space-y-3 ${isFullscreen ? 'min-h-0' : ''}`}>
                 {visibleTodayMatches.length ? (
                   <div className="stagger-children space-y-3">
                     {visibleTodayMatches.map((p) => (
-                    <div key={p.id} className={`rounded-xl border border-primary/10 bg-surface transition ${updatedMatchIds.includes(p.id) ? 'ring-2 ring-emerald-300/70 shadow-lg shadow-emerald-200/40' : ''} ${isFullscreen ? 'p-3' : 'p-4'}`}>
+                    <div key={p.id} className={`rounded-xl border border-primary/10 bg-surface transition ${updatedMatchIds.includes(p.id) ? 'ring-2 ring-emerald-300/70 shadow-lg shadow-emerald-200/40' : ''} ${isUltraCompactFullscreen ? 'p-2.5' : isFullscreen ? 'p-3' : 'p-4'}`}>
                       <div className="mb-1 flex items-center justify-between gap-2">
-                        <span className="font-score text-2xl font-bold text-primary">{formatPartidoTime(p.hora)}</span>
+                        <span className={`font-score font-bold text-primary ${isUltraCompactFullscreen ? 'text-xl' : 'text-2xl'}`}>{formatPartidoTime(p.hora)}</span>
                         <Badge variant={p.estado === 'en_curso' ? 'live' : 'default'}>{p.estado}</Badge>
                       </div>
                       <div className="mb-2 flex flex-wrap gap-2">
                         <Badge className="px-2.5 py-1 text-[11px] uppercase tracking-wide">{p.disciplina}</Badge>
                         <Badge variant="muted">{p.categoria}</Badge>
                       </div>
-                      <p className="text-lg font-semibold text-primary">
+                      <p className={`line-clamp-2 font-semibold text-primary ${isUltraCompactFullscreen ? 'text-base' : 'text-lg'}`}>
                         {p.localNombre} vs {p.visitaNombre}
                       </p>
                       <p className="text-xs text-muted">{p.genero} · {p.grupo || p.fase}</p>
@@ -676,11 +746,11 @@ export function KioscoPage() {
               </CardContent>
             </Card>
 
-            <Card className={`border-white/20 bg-white/95 shadow-2xl ${isFullscreen ? 'h-full xl:col-span-7' : 'xl:col-span-2'}`}>
+            <Card className={`self-start border-white/20 bg-white/95 shadow-2xl ${isFullscreen ? 'xl:col-span-7' : 'xl:col-span-2'}`}>
               <CardHeader>
-                <CardTitle className="font-display text-3xl text-primary">Próximos encuentros</CardTitle>
+                <CardTitle className={`font-display text-primary ${isUltraCompactFullscreen ? 'text-2xl' : 'text-3xl'}`}>Próximos encuentros</CardTitle>
                 <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-                  <CardTitle className="font-display text-3xl text-primary">Panel rotativo</CardTitle>
+                  <CardTitle className={`font-display text-primary ${isUltraCompactFullscreen ? 'text-2xl' : 'text-3xl'}`}>Panel rotativo</CardTitle>
                   <div className="flex flex-wrap gap-2">
                     {ROTATING_PANELS.map((panel) => (
                       <Button
@@ -697,23 +767,23 @@ export function KioscoPage() {
                 </div>
               </CardHeader>
               <CardContent className={`overflow-hidden ${isFullscreen ? 'min-h-0' : ''}`}>
-                <div key={activePanel} className={`animate-fade-up transition-all duration-700 ${isFullscreen ? 'min-h-[320px]' : 'min-h-[260px]'}`}>
+                <div key={activePanel} className={`animate-fade-up transition-all duration-700 ${isUltraCompactFullscreen ? 'min-h-[220px]' : isCompactFullscreen ? 'min-h-[260px]' : isFullscreen ? 'min-h-[320px]' : 'min-h-[260px]'}`}>
                 {activePanel === 'timeline' ? (
                   <div className="space-y-4">
                     <div className="flex items-center gap-2 text-primary">
                       <Timeline className="h-5 w-5" />
                       <p className="text-sm font-semibold">Línea de tiempo de hoy</p>
                     </div>
-                    <div className={`${isFullscreen ? 'grid gap-3 md:grid-cols-2 xl:grid-cols-4' : 'flex gap-3 overflow-x-auto pb-2'} stagger-children`}>
+                    <div className={`${isFullscreen ? `grid gap-3 md:grid-cols-2 ${isUltraCompactFullscreen ? 'xl:grid-cols-3' : 'xl:grid-cols-4'}` : 'flex gap-3 overflow-x-auto pb-2'} stagger-children`}>
                       {visibleTodayMatches.length ? (
                         visibleTodayMatches.map((p) => (
-                          <div key={p.id} className={`rounded-2xl border border-primary/10 bg-white ${isFullscreen ? 'p-3' : 'min-w-[260px] p-4'} ${updatedMatchIds.includes(p.id) ? 'ring-2 ring-emerald-300/70' : ''}`}>
-                            <p className="font-score text-lg font-bold text-secondary">{formatPartidoTime(p.hora)}</p>
+                          <div key={p.id} className={`rounded-2xl border border-primary/10 bg-white ${isUltraCompactFullscreen ? 'p-2.5' : isFullscreen ? 'p-3' : 'min-w-[260px] p-4'} ${updatedMatchIds.includes(p.id) ? 'ring-2 ring-emerald-300/70' : ''}`}>
+                            <p className={`font-score font-bold text-secondary ${isUltraCompactFullscreen ? 'text-base' : 'text-lg'}`}>{formatPartidoTime(p.hora)}</p>
                             <div className="mt-2 flex flex-wrap gap-2">
                               <Badge className="px-2.5 py-1 text-[11px] uppercase tracking-wide">{p.disciplina}</Badge>
                               <Badge variant="muted">{p.lugar}</Badge>
                             </div>
-                            <p className="mt-3 text-lg font-semibold text-primary">{p.localNombre}</p>
+                            <p className={`mt-3 line-clamp-2 font-semibold text-primary ${isUltraCompactFullscreen ? 'text-base' : 'text-lg'}`}>{p.localNombre}</p>
                             <p className="text-sm text-muted">vs {p.visitaNombre}</p>
                             <p className="mt-2 text-xs text-muted">{p.genero} · {p.grupo || p.fase}</p>
                           </div>
@@ -731,17 +801,17 @@ export function KioscoPage() {
                       <Trophy className="h-5 w-5" />
                       <p className="text-sm font-semibold">Últimos resultados registrados</p>
                     </div>
-                    <div className="stagger-children grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    <div className={`stagger-children grid gap-3 md:grid-cols-2 ${isUltraCompactFullscreen ? 'xl:grid-cols-2' : 'xl:grid-cols-3'}`}>
                       {visibleRecentResults.length ? (
                         visibleRecentResults.map((p) => (
-                          <div key={p.id} className={`rounded-xl border border-primary/10 bg-white ${isFullscreen ? 'p-3' : 'p-4'} ${updatedMatchIds.includes(p.id) ? 'ring-2 ring-emerald-300/70' : ''}`}>
+                          <div key={p.id} className={`rounded-xl border border-primary/10 bg-white ${isUltraCompactFullscreen ? 'p-2.5' : isFullscreen ? 'p-3' : 'p-4'} ${updatedMatchIds.includes(p.id) ? 'ring-2 ring-emerald-300/70' : ''}`}>
                             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary/60">{formatPartidoDateLabel(p.fecha)}</p>
                             <div className="mt-2 flex flex-wrap gap-2">
                               <Badge className="px-2.5 py-1 text-[11px] uppercase tracking-wide">{p.disciplina}</Badge>
                               <Badge variant="muted">{p.categoria}</Badge>
                             </div>
-                            <p className="mt-3 text-sm font-semibold text-primary">{p.localNombre} vs {p.visitaNombre}</p>
-                            <p className="font-score mt-2 text-3xl font-bold text-secondary">
+                            <p className="mt-3 line-clamp-2 text-sm font-semibold text-primary">{p.localNombre} vs {p.visitaNombre}</p>
+                            <p className={`font-score mt-2 font-bold text-secondary ${isUltraCompactFullscreen ? 'text-2xl' : 'text-3xl'}`}>
                               {Number(p.marcadorLocal || 0)}:{Number(p.marcadorVisita || 0)}
                             </p>
                             <p className="text-xs text-muted">{p.lugar}</p>
@@ -766,13 +836,13 @@ export function KioscoPage() {
                         <p className="text-sm text-muted">Se muestran sus últimos cruces finalizados dentro del campeonato filtrado.</p>
                       </div>
                     ) : null}
-                    <div className="stagger-children grid gap-3 md:grid-cols-3">
+                    <div className={`stagger-children grid gap-3 ${isUltraCompactFullscreen ? 'md:grid-cols-2 xl:grid-cols-2' : 'md:grid-cols-3'}`}>
                       {historialCruce.length ? (
                         historialCruce.map((p) => (
-                          <div key={p.id} className="rounded-xl border border-primary/10 bg-white p-4">
+                          <div key={p.id} className={`rounded-xl border border-primary/10 bg-white ${isUltraCompactFullscreen ? 'p-3' : 'p-4'}`}>
                             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary/60">{formatPartidoDateLabel(p.fecha)}</p>
                             <p className="mt-2 text-sm font-semibold text-primary">{p.localNombre} vs {p.visitaNombre}</p>
-                            <p className="font-score mt-2 text-3xl font-bold text-secondary">
+                            <p className={`font-score mt-2 font-bold text-secondary ${isUltraCompactFullscreen ? 'text-2xl' : 'text-3xl'}`}>
                               {Number(p.marcadorLocal || 0)}:{Number(p.marcadorVisita || 0)}
                             </p>
                             <p className="text-xs text-muted">{p.disciplina} · {p.lugar}</p>
@@ -791,7 +861,7 @@ export function KioscoPage() {
                       <Sparkles className="h-5 w-5" />
                       <p className="text-sm font-semibold">Avisos operativos de la jornada</p>
                     </div>
-                    <div className="stagger-children grid gap-3 md:grid-cols-2">
+                    <div className={`stagger-children grid gap-3 ${isUltraCompactFullscreen ? 'md:grid-cols-1 xl:grid-cols-2' : 'md:grid-cols-2'}`}>
                       {avisosOperativos.length ? (
                         avisosOperativos.map((note) => (
                           <div key={note} className="rounded-xl border border-primary/10 bg-white p-4 text-sm font-medium text-primary">
@@ -811,22 +881,22 @@ export function KioscoPage() {
               </CardContent>
             </Card>
 
-            <Card className={`border-white/20 bg-white/95 shadow-2xl ${isFullscreen ? 'h-full xl:col-span-5' : 'xl:col-span-2'}`}>
+            <Card className={`self-start border-white/20 bg-white/95 shadow-2xl ${isFullscreen ? 'xl:col-span-5' : 'xl:col-span-2'}`}>
               <CardHeader>
-                <CardTitle className="font-display text-3xl text-primary">Próximos encuentros</CardTitle>
+                <CardTitle className={`font-display text-primary ${isUltraCompactFullscreen ? 'text-2xl' : 'text-3xl'}`}>Próximos encuentros</CardTitle>
               </CardHeader>
-              <CardContent className={`grid gap-3 ${isFullscreen ? 'md:grid-cols-2 xl:grid-cols-2' : 'md:grid-cols-2 xl:grid-cols-4'}`}>
+              <CardContent className={`grid gap-3 ${isUltraCompactFullscreen ? 'md:grid-cols-1 xl:grid-cols-1' : isFullscreen ? 'md:grid-cols-2 xl:grid-cols-2' : 'md:grid-cols-2 xl:grid-cols-4'}`}>
                 {visibleUpcomingMatches.length ? (
                   visibleUpcomingMatches.map((p) => (
-                    <div key={p.id} className={`rounded-xl border border-primary/10 bg-white p-3 ${updatedMatchIds.includes(p.id) ? 'ring-2 ring-emerald-300/70' : ''}`}>
-                      <p className="font-score text-sm font-bold text-secondary">
+                    <div key={p.id} className={`rounded-xl border border-primary/10 bg-white ${isUltraCompactFullscreen ? 'p-2.5' : 'p-3'} ${updatedMatchIds.includes(p.id) ? 'ring-2 ring-emerald-300/70' : ''}`}>
+                      <p className={`font-score font-bold text-secondary ${isUltraCompactFullscreen ? 'text-xs' : 'text-sm'}`}>
                         {formatPartidoDateKey(p.fecha)} · {formatPartidoTime(p.hora)}
                       </p>
                       <div className="mt-2 flex flex-wrap gap-2">
                         <Badge className="px-2.5 py-1 text-[11px] uppercase tracking-wide">{p.disciplina}</Badge>
                         <Badge variant="muted">{p.categoria}</Badge>
                       </div>
-                      <p className="mt-1 line-clamp-2 text-sm font-semibold text-primary">
+                      <p className={`mt-1 line-clamp-2 font-semibold text-primary ${isUltraCompactFullscreen ? 'text-xs' : 'text-sm'}`}>
                         {p.localNombre} vs {p.visitaNombre}
                       </p>
                       <p className="mt-1 text-xs text-muted">{p.lugar}</p>
