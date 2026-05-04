@@ -13,6 +13,10 @@
 var CSVImport = {
   migrateFromTemp: function (payload) {
     payload = payload || {};
+    if (payload.multiDisciplina || !payload.disciplinaId) {
+      return CSVImport.migrateMultipleFromTemp_(payload);
+    }
+
     const campeonatoId = payload.campeonatoId;
     const disciplinaId = payload.disciplinaId;
     const disciplinaNombre = payload.disciplina || 'VOLEIBOL';
@@ -22,7 +26,7 @@ var CSVImport = {
       return errorResponse('campeonatoId y disciplinaId son obligatorios', 400);
     }
 
-    const rows = sheetToObjects('import_temp');
+    const rows = payload.sourceRows || sheetToObjects('import_temp');
     if (!rows.length) {
       return errorResponse('import_temp vacía o sin datos', 400);
     }
@@ -37,6 +41,20 @@ var CSVImport = {
     });
 
     const partidosExistentes = sheetToObjects('partidos');
+    const partidosIndex = {};
+    partidosExistentes.forEach(function (p) {
+      const key = CSVImport.partidoKey_({
+        campeonatoId: p.campeonatoId,
+        disciplinaId: p.disciplinaId,
+        fecha: p.fecha,
+        hora: p.hora,
+        localId: p.localId,
+        visitaId: p.visitaId
+      });
+      if (key) {
+        partidosIndex[key] = p;
+      }
+    });
     let created = 0;
     let teamsCreated = 0;
     let skipped = 0;
@@ -74,31 +92,30 @@ var CSVImport = {
 
       const fecha = CSVImport.normalizeFecha_(norm.fecha || '');
       const hora = norm.hora || '';
-      const partidoYaExiste = partidosExistentes.some(function (p) {
-        return String(p.campeonatoId) === String(campeonatoId) &&
-          String(p.disciplinaId) === String(disciplinaId) &&
-          CSVImport.normalizeFecha_(p.fecha) === String(fecha) &&
-          String(p.hora) === String(hora) &&
-          String(p.localId) === String(localId) &&
-          String(p.visitaId) === String(visitaId);
+      const partidoKey = CSVImport.partidoKey_({
+        campeonatoId: campeonatoId,
+        disciplinaId: disciplinaId,
+        fecha: fecha,
+        hora: hora,
+        localId: localId,
+        visitaId: visitaId
       });
+      const existente = partidosIndex[partidoKey];
+      const partidoYaExiste = Boolean(existente);
 
       if (partidoYaExiste) {
-        const existente = partidosExistentes.find(function (p) {
-          return String(p.campeonatoId) === String(campeonatoId) &&
-            String(p.disciplinaId) === String(disciplinaId) &&
-            CSVImport.normalizeFecha_(p.fecha) === String(fecha) &&
-            String(p.hora) === String(hora) &&
-            String(p.localId) === String(localId) &&
-            String(p.visitaId) === String(visitaId);
-        });
         if (existente && existente.id) {
           updateRowById('partidos', existente.id, {
             fecha: fecha,
+            hora: hora,
+            lugar: norm.lugar || existente.lugar || 'GIMNASIO TECHADO',
             grupo: grupo,
             disciplina: norm.disciplina || norm.deporte || disciplinaNombre,
+            fase: norm.fase || existente.fase || 'grupos',
             genero: genero,
-            categoria: categoria
+            categoria: categoria,
+            estado: norm.estado || existente.estado || 'programado',
+            jornada: norm.jornada !== undefined && norm.jornada !== '' ? norm.jornada : existente.jornada
           });
         }
         skipped++;
@@ -132,6 +149,7 @@ var CSVImport = {
       }
 
       appendRow('partidos', partido);
+      partidosIndex[partidoKey] = partido;
       teamsCreated = Object.keys(equipoByNombre).filter(function (k) {
         return String(k).indexOf('__created__') >= 0;
       }).length;
@@ -142,9 +160,108 @@ var CSVImport = {
 
     return jsonResponse({
       migrated: true,
+      mode: 'single',
+      disciplinaId: disciplinaId,
+      disciplina: disciplinaNombre,
       partidosCreated: created,
       teamsCreated: teamsCreated,
       skippedRows: skipped
+    });
+  },
+
+  migrateMultipleFromTemp_: function (payload) {
+    payload = payload || {};
+    const campeonatoId = String(payload.campeonatoId || '').trim();
+    const rows = sheetToObjects('import_temp');
+    const categoriaDefault = payload.categoria || 'Sub14';
+    const autoCrearEquipos = payload.autoCrearEquipos !== false;
+    const groupedRows = {};
+    const existingDisciplines = sheetToObjects('disciplinas').filter(function (row) {
+      return String(row.campeonatoId) === campeonatoId;
+    });
+
+    if (!campeonatoId) {
+      return errorResponse('campeonatoId es obligatorio', 400);
+    }
+    if (!rows.length) {
+      return errorResponse('import_temp vacía o sin datos', 400);
+    }
+
+    rows.forEach(function (raw) {
+      const norm = CSVImport.normalizeRow_(raw);
+      const disciplinaNombre = CSVImport.resolveDisciplinaNombre_(norm, payload);
+      if (!disciplinaNombre) return;
+
+      const groupKey = CSVImport.normalizeKey_(disciplinaNombre);
+      if (!groupedRows[groupKey]) {
+        groupedRows[groupKey] = {
+          nombre: disciplinaNombre,
+          rows: [],
+          categorias: []
+        };
+      }
+      const categoria = String(norm.categoria || categoriaDefault).trim();
+      if (categoria && groupedRows[groupKey].categorias.indexOf(categoria) < 0) {
+        groupedRows[groupKey].categorias.push(categoria);
+      }
+      groupedRows[groupKey].rows.push(raw);
+    });
+
+    const grupos = Object.keys(groupedRows);
+    if (!grupos.length) {
+      return errorResponse('No se encontraron disciplinas válidas en import_temp', 400);
+    }
+
+    const disciplinasImportadas = [];
+    let totalPartidos = 0;
+    let totalEquipos = 0;
+    let totalSkipped = 0;
+
+    grupos.forEach(function (key) {
+      const group = groupedRows[key];
+      const disciplina = CSVImport.ensureDisciplinaForImport_({
+        campeonatoId: campeonatoId,
+        nombre: group.nombre,
+        categoriaDefault: categoriaDefault,
+        categorias: group.categorias,
+        existingDisciplines: existingDisciplines
+      });
+      const response = CSVImport.migrateFromTemp({
+        campeonatoId: campeonatoId,
+        disciplinaId: disciplina.id,
+        disciplina: disciplina.nombre,
+        categoria: categoriaDefault,
+        autoCrearEquipos: autoCrearEquipos,
+        sourceRows: group.rows
+      });
+      const parsed = JSON.parse(response.getContent());
+      if (Number(parsed.status) >= 400) {
+        throw new Error((parsed.data && parsed.data.error) || 'Error al importar disciplina');
+      }
+
+      const data = parsed.data || {};
+      totalPartidos += Number(data.partidosCreated || 0);
+      totalEquipos += Number(data.teamsCreated || 0);
+      totalSkipped += Number(data.skippedRows || 0);
+      disciplinasImportadas.push({
+        id: disciplina.id,
+        nombre: disciplina.nombre,
+        partidosCreated: Number(data.partidosCreated || 0),
+        teamsCreated: Number(data.teamsCreated || 0),
+        skippedRows: Number(data.skippedRows || 0)
+      });
+    });
+
+    CSVImport.syncCampeonatoDisciplinas_(campeonatoId, existingDisciplines);
+
+    return jsonResponse({
+      migrated: true,
+      mode: 'multi',
+      disciplinas: disciplinasImportadas,
+      disciplinasCount: disciplinasImportadas.length,
+      partidosCreated: totalPartidos,
+      teamsCreated: totalEquipos,
+      skippedRows: totalSkipped
     });
   },
 
@@ -174,6 +291,15 @@ var CSVImport = {
     const raw = CSVImport.normalizeKey_(value);
     if (raw === 'varones' || raw === 'varon' || raw === 'masculino') return 'Varones';
     return 'Damas';
+  },
+
+  resolveDisciplinaNombre_: function (norm, payload) {
+    const raw = String(norm.disciplina || norm.deporte || payload.disciplina || '').trim();
+    if (!raw) return '';
+    return raw
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toUpperCase();
   },
 
   normalizeGrupo_: function (value) {
@@ -215,6 +341,96 @@ var CSVImport = {
       CSVImport.normalizeKey_(genero || ''),
       CSVImport.normalizeKey_(categoria || '')
     ].join('|');
+  },
+
+  partidoKey_: function (options) {
+    if (!options) return '';
+
+    return [
+      String(options.campeonatoId || '').trim(),
+      String(options.disciplinaId || '').trim(),
+      CSVImport.normalizeFecha_(options.fecha || ''),
+      String(options.hora || '').trim(),
+      String(options.localId || '').trim(),
+      String(options.visitaId || '').trim()
+    ].join('|');
+  },
+
+  disciplinaSlug_: function (nombre) {
+    return CSVImport.normalizeKey_(nombre || '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  },
+
+  ensureDisciplinaForImport_: function (options) {
+    const nombre = String(options.nombre || '').trim().toUpperCase();
+    const key = CSVImport.normalizeKey_(nombre);
+    const categoriaDefault = String(options.categoriaDefault || 'Sub14').trim();
+    const categorias = (options.categorias || []).length ? options.categorias : [categoriaDefault];
+    const existing = (options.existingDisciplines || []).find(function (row) {
+      return CSVImport.normalizeKey_(row.nombre || '') === key;
+    });
+
+    if (existing) {
+      categorias.forEach(function (categoria) {
+        CSVImport.ensureDisciplinaCategoria_(existing, categoria);
+      });
+      return {
+        id: existing.id,
+        nombre: String(existing.nombre || nombre)
+      };
+    }
+
+    const slug = CSVImport.disciplinaSlug_(nombre) || generateUUID();
+    const id = 'disc-' + slug;
+    const payload = {
+      id: id,
+      campeonatoId: options.campeonatoId,
+      nombre: nombre,
+      categorias: categorias.join(', '),
+      estado: 'activo'
+    };
+    appendRow('disciplinas', payload);
+    options.existingDisciplines.push(payload);
+    return {
+      id: id,
+      nombre: nombre
+    };
+  },
+
+  ensureDisciplinaCategoria_: function (disciplinaRow, categoria) {
+    const nextCategory = String(categoria || '').trim();
+    if (!nextCategory) return;
+
+    const current = String(disciplinaRow.categorias || '').trim();
+    if (!current) {
+      updateRowById('disciplinas', disciplinaRow.id, { categorias: nextCategory });
+      disciplinaRow.categorias = nextCategory;
+      return;
+    }
+
+    const normalizedCurrent = current.split(',').map(function (item) {
+      return String(item).trim();
+    }).filter(String);
+
+    if (normalizedCurrent.indexOf(nextCategory) >= 0) return;
+
+    normalizedCurrent.push(nextCategory);
+    const merged = normalizedCurrent.join(', ');
+    updateRowById('disciplinas', disciplinaRow.id, { categorias: merged });
+    disciplinaRow.categorias = merged;
+  },
+
+  syncCampeonatoDisciplinas_: function (campeonatoId, disciplinas) {
+    const campeonato = sheetToObjects('campeonatos').find(function (row) {
+      return String(row.id) === String(campeonatoId);
+    });
+    if (!campeonato || !campeonato.id) return;
+
+    const nombres = disciplinas
+      .map(function (row) { return String(row.nombre || '').trim().toUpperCase(); })
+      .filter(String)
+      .filter(function (value, index, arr) { return arr.indexOf(value) === index; });
+
+    updateRowById('campeonatos', campeonato.id, { disciplinas: nombres.join(', ') });
   },
 
   ensureEquipo_: function (options) {

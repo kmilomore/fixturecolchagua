@@ -10,6 +10,7 @@ El objetivo del MVP es:
 - Importar fixture desde una hoja simple (`import_temp`).
 - Mostrar partidos por campeonato, disciplina, género, categoría y fase.
 - Administrar resultados desde un panel básico.
+- Exponer resúmenes optimizados para home y modo kiosco sin descargar todo el fixture en esas vistas.
 - Mantener el sistema extensible para más disciplinas y campeonatos.
 - Mantener el sitio como espacio público: solo usuarios admin pueden crear campeonatos.
 
@@ -58,6 +59,15 @@ FIXTURE 2.0/
 - Base de datos: Google Sheets.
 - Deploy frontend: Vercel.
 
+## Funcionalidades Nuevas Documentadas
+
+- Endpoint resumido de partidos para home y kiosco mediante `?resource=partidos&vista=resumen`.
+- Sesión admin con expiración local en `sessionStorage` para no reutilizar tokens indefinidamente.
+- Navegación móvil sin duplicidad entre `Campeonatos` y `Fixture`, con acceso directo al campeonato activo.
+- Estados vacíos y errores más útiles en `Mis partidos` y `Admin resultados`.
+- Feedback transaccional visible al guardar resultados y recálculo de tablas.
+- Saneamiento básico de strings provenientes de Google Sheets antes de exponerlos al frontend.
+
 ## Identidad Visual
 
 La aplicación usa el logo `frontend/public/SLEPCOLCHAGUA.webp` como:
@@ -97,6 +107,8 @@ VITE_GOOGLE_CLIENT_ID=<google_oauth_client_id>
 ```
 
 La autenticación admin debe usar Google Sign-In. El frontend necesita `VITE_GOOGLE_CLIENT_ID` y el backend debe validar el `id_token` contra `GOOGLE_CLIENT_ID`. La autorización admin debe resolverse cruzando el correo en una hoja `admin_whitelist` dentro del mismo Spreadsheet.
+
+La sesión admin del frontend se persiste en `sessionStorage`, pero ahora incluye expiración local. Si la sesión expira, el guard de rutas deja de considerarla válida y el cliente deja de reenviar el token automáticamente.
 
 Diferencia operativa importante:
 
@@ -183,15 +195,24 @@ Esta función:
 
 - Crea hojas faltantes.
 - Agrega encabezados faltantes.
-- Crea campeonato base `camp-2026`.
-- Crea disciplina base `disc-voleibol`.
+- Crea campeonato base `camp-2026` si no existe.
 - Lee `import_temp`.
+- Detecta automáticamente múltiples disciplinas desde la columna `DEPORTE`.
+- Crea o reutiliza filas en `disciplinas` por cada deporte encontrado.
 - Crea equipos automáticamente.
-- Crea o actualiza partidos.
+- Crea o actualiza partidos por disciplina.
 - Convierte fechas a `YYYY-MM-DD`.
 - Convierte horas a `HH:mm` al exponerlas desde la API.
-- Reconstruye la hoja `grupos` usando `equipos.grupo`.
+- Reconstruye la hoja `grupos` usando `equipos.grupo` para cada disciplina importada.
 - Evita duplicar partidos al reejecutar.
+
+Notas de uso:
+
+- Si `import_temp` mezcla varias disciplinas, `importarFixtureInicialDesdeImportTemp()` es ahora la función correcta.
+- Si quieres importar solo una disciplina específica, existe `importarUnaDisciplinaDesdeImportTemp(disciplinaNombre, disciplinaId, categoria)`.
+- El importador multi usa la columna `DEPORTE` para separar filas por disciplina. Si esa columna viene vacía, la fila no puede clasificarse correctamente.
+- Las nuevas disciplinas se crean con ID derivado del nombre, por ejemplo `disc-futsal`, `disc-basquetbol`, `disc-balonmano`.
+- El campo `campeonatos.disciplinas` se sincroniza automáticamente con la lista detectada en la importación.
 
 Si se corrige algo en `import_temp`, se puede volver a ejecutar el importador. El sistema debe actualizar partidos existentes y saltar duplicados.
 
@@ -211,9 +232,28 @@ https://script.google.com/macros/s/<DEPLOYMENT_ID>/exec
 ?resource=disciplinas&campeonatoId=<id>
 ?resource=equipos&campeonatoId=<id>
 ?resource=partidos&campeonatoId=<id>&disciplinaId=<id>&genero=<Damas|Varones>&fase=<fase>
+?resource=partidos&campeonatoId=<id>&vista=resumen
 ?resource=grupos&campeonatoId=<id>&disciplinaId=<id>&genero=<Damas|Varones>
 ?resource=tabla&grupoId=<id>
 ```
+
+`vista=resumen` devuelve un payload agregado orientado a pantallas públicas de consulta rápida:
+
+```json
+{
+  "siguiente": {},
+  "hoy": [],
+  "proximos": [],
+  "totalHoy": 0,
+  "updatedAt": "2026-05-04T12:00:00.000Z"
+}
+```
+
+Uso recomendado:
+
+- `HomePage`: próximo partido y partidos de hoy del campeonato activo.
+- `KioscoPage`: siguiente partido, partidos de hoy y próximos encuentros con polling cada 60 segundos.
+- No usar `vista=resumen` en vistas operativas que necesiten el fixture completo.
 
 ### POST
 
@@ -310,6 +350,23 @@ Alternativa a ejecutar el script manual:
 }
 ```
 
+Modo multi-disciplina por POST:
+
+```json
+{
+  "resource": "import",
+  "action": "migrate",
+  "payload": {
+    "campeonatoId": "camp-2026",
+    "multiDisciplina": true,
+    "categoria": "Sub14",
+    "autoCrearEquipos": true
+  }
+}
+```
+
+En ese modo, `disciplinaId` deja de ser obligatorio porque el backend lo resuelve por cada deporte encontrado en `import_temp`.
+
 ## Rutas Frontend
 
 ### Públicas
@@ -330,7 +387,7 @@ Alternativa a ejecutar el script manual:
 - `/admin/resultados`: ingreso de resultados.
 - `/campeonatos/nuevo`: wizard simple de creación, protegido por sesión admin.
 
-La ruta `/campeonatos/nuevo` no debe ser pública. Si el usuario no tiene sesión admin (`useAdminSession().ok`), se redirige a `/admin`.
+La ruta `/campeonatos/nuevo` no debe ser pública. Si el usuario no tiene sesión admin activa, se redirige a `/admin`.
 
 ## Archivos Clave del Frontend
 
@@ -348,10 +405,11 @@ La ruta `/campeonatos/nuevo` no debe ser pública. Si el usuario no tiene sesió
 - `src/pages/campeonato/*`: páginas internas del campeonato.
 - `src/pages/campeonato/CampeonatoLayout.tsx`: cabecera de campeonato con gradiente institucional.
 - `src/pages/MisPartidosPage.tsx`: vista pública para buscar partidos por establecimiento.
-- `src/pages/KioscoPage.tsx`: modo kiosco/proyector con actualización automática cada 60 segundos.
+- `src/pages/KioscoPage.tsx`: modo kiosco/proyector con actualización automática cada 60 segundos y reloj aislado para no rerenderizar toda la vista por segundo.
+- `src/pages/admin/AdminResultadosPage.tsx`: flujo de marcadores con feedback de guardado, selección automática de campeonato activo y estados vacíos operativos.
 - `src/utils/formatDate.ts`: normalización y formato de fechas/horas.
 - `src/utils/matches.ts`: helpers para próximo partido, partidos de hoy, búsqueda y ordenamiento.
-- `src/stores/adminSession.ts`: sesión admin persistida en sessionStorage con `id_token` y perfil Google.
+- `src/stores/adminSession.ts`: sesión admin persistida en sessionStorage con `id_token`, perfil Google y expiración local.
 
 ## Estilo Global del Frontend
 
@@ -380,6 +438,7 @@ Debe usar scroll horizontal en pantallas pequeñas, no apilar botones verticalme
 - Por eso `Matches.gs` normaliza API output:
   - `fecha`: `YYYY-MM-DD`.
   - `hora`: `HH:mm`.
+- `Matches.gs` también sanea texto básico proveniente de Sheets para evitar caracteres de control, espacios duplicados y strings visualmente sucios en nombre de equipos, lugar, grupo, fase y estado.
 - El calendario frontend agrupa por `YYYY-MM-DD`; si llega otro formato, los partidos pueden no aparecer.
 - La hoja `grupos` no se llena sola con solo agregar la columna `Grupo`; debe ejecutarse `CSVImport.rebuildGrupos_()` mediante `importarFixtureInicialDesdeImportTemp()`.
 - `Groups.getTabla()` muestra participantes aunque `tabla_posiciones` esté vacía, usando `grupos.equiposIds` como fallback.
@@ -387,9 +446,13 @@ Debe usar scroll horizontal en pantallas pequeñas, no apilar botones verticalme
 - El bracket de fases reales se renderiza desde `BracketView`. Muestra semifinales, final, tercer lugar y campeón cuando existen partidos con fase `semifinal`, `final` y `tercer_lugar`.
 - Si no hay fases cargadas, `BracketView` muestra un mensaje claro en vez de una grilla vacía.
 - La creación de campeonatos es una función administrativa. No debe aparecer como acción pública en home/listados.
-- El home muestra un bloque de próximo partido y partidos de hoy usando el campeonato activo.
-- La vista `Mis partidos` filtra por coincidencia parcial en `localNombre` y `visitaNombre`.
-- El modo kiosco consulta partidos cada 60 segundos mediante TanStack Query (`refetchInterval`).
+- El home muestra un bloque de próximo partido y partidos de hoy usando el campeonato activo, pero ahora consume un resumen agregado desde GAS en vez de pedir el fixture completo.
+- La navegación móvil usa acceso directo al fixture del campeonato activo para reducir fricción de consulta.
+- La vista `Mis partidos` filtra por coincidencia parcial en `localNombre`, `visitaNombre`, `localId` y `visitaId`, y muestra estados vacíos guiados cuando no hay campeonato, no hay resultados o no se ha iniciado búsqueda.
+- El modo kiosco consulta partidos cada 60 segundos mediante TanStack Query (`refetchInterval`) y usa el endpoint resumido para reducir carga de red y procesamiento.
+- `AdminResultadosPage` prioriza automáticamente el campeonato activo cuando existe y muestra resumen de pendientes/finalizados.
+- Al guardar un resultado desde admin, el usuario recibe confirmación visible y luego se invalidan queries de `partidos` y `tabla` para refrescar datos relacionados.
+- Los guards de rutas admin ya no deben basarse solo en un booleano persistido; la sesión debe considerarse válida solo mientras no expire.
 - La integración con Google Sign-In requiere permitir `https://accounts.google.com` en CSP para scripts y estilos. En Vercel se usa además `style-src-elem` para evitar el bloqueo del stylesheet de GSI.
 - El frontend publica `Cross-Origin-Opener-Policy: same-origin-allow-popups` para convivir mejor con el flujo popup de Google Identity Services.
 - El warning `Cross-Origin-Opener-Policy policy would block the window.postMessage call` puede seguir apareciendo en consola incluso cuando el login funciona. Si la credencial vuelve y el acceso admin entra, se considera ruido no bloqueante.
@@ -408,6 +471,8 @@ Debe usar scroll horizontal en pantallas pequeñas, no apilar botones verticalme
 - No usar contraseñas locales para admin; el acceso debe resolverse solo con Google Sign-In y validación backend.
 - No volver a dejar `/campeonatos/nuevo` accesible públicamente.
 - No agregar botones públicos de "Crear campeonato" en home o listado sin validar admin.
+- No volver a duplicar en móvil accesos que lleven al mismo destino, como `Campeonatos` y `Fixture` apuntando ambos a `/campeonatos`.
+- No usar el query completo de partidos en home o kiosco si el resumen agregado cubre la necesidad.
 - No usar amarillo/dorado para acciones principales; la paleta actual usa azul profundo, azul SLEP, rojo y gris claro.
 - No cambiar el logo por otro archivo sin actualizar `index.html`, `AppShell` y la portada.
 - No envolver `/kiosco` en `AppShell`; debe conservar pantalla completa sin navbar.
@@ -434,6 +499,7 @@ Después de cambiar archivos `gas/*.gs`, copiar/actualizar en Apps Script y rede
 - Agregar botón admin para ejecutar importación desde el frontend.
 - Agregar vista de detalle de partido.
 - Agregar generación automática de grupos desde `import_temp`.
-- Mantener lista blanca de correos admin y rotación del cliente OAuth cuando cambie el entorno.
+- Mantener lista blanca de correos admin, expiración razonable de sesión y rotación del cliente OAuth cuando cambie el entorno.
 - Separar chunk del frontend con lazy routes si crece el bundle.
+- Evaluar autorrotación real del modo kiosco por jornada/cancha si se usará en pantallas físicas.
 - Agregar carga/edición visual de semifinales, final y tercer lugar desde admin.

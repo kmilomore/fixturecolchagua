@@ -6,7 +6,8 @@
  * 1. Copia este archivo al proyecto GAS.
  * 2. Asegúrate de tener la hoja import_temp con:
  *    DEPORTE, FECHA, LUGAR, Hora, Local, Visita, Género, Grupo
- * 3. Ejecuta importarFixtureInicialDesdeImportTemp().
+ * 3. Ejecuta importarFixtureInicialDesdeImportTemp() para autodetectar disciplinas.
+ * 4. Si necesitas una sola disciplina por corrida, usa importarUnaDisciplinaDesdeImportTemp(...).
  */
 
 const INITIAL_CAMPEONATO_ID = 'camp-2026';
@@ -14,13 +15,30 @@ const INITIAL_DISCIPLINA_ID = 'disc-voleibol';
 
 function importarFixtureInicialDesdeImportTemp() {
   asegurarEstructuraSheets_();
-  asegurarDatosBase_();
+  asegurarCampeonatoBase_();
 
   const response = CSVImport.migrateFromTemp({
     campeonatoId: INITIAL_CAMPEONATO_ID,
-    disciplinaId: INITIAL_DISCIPLINA_ID,
-    disciplina: 'VOLEIBOL',
+    multiDisciplina: true,
     categoria: 'Sub14',
+    autoCrearEquipos: true
+  });
+
+  const content = response.getContent();
+  Logger.log(content);
+  return content;
+}
+
+function importarUnaDisciplinaDesdeImportTemp(disciplinaNombre, disciplinaId, categoria) {
+  asegurarEstructuraSheets_();
+  asegurarCampeonatoBase_();
+  asegurarDisciplinaBase_(disciplinaId || INITIAL_DISCIPLINA_ID, disciplinaNombre || 'VOLEIBOL', categoria || 'Sub14');
+
+  const response = CSVImport.migrateFromTemp({
+    campeonatoId: INITIAL_CAMPEONATO_ID,
+    disciplinaId: disciplinaId || INITIAL_DISCIPLINA_ID,
+    disciplina: disciplinaNombre || 'VOLEIBOL',
+    categoria: categoria || 'Sub14',
     autoCrearEquipos: true
   });
 
@@ -85,7 +103,7 @@ function asegurarEstructuraSheets_() {
   });
 }
 
-function asegurarDatosBase_() {
+function asegurarCampeonatoBase_() {
   const campeonatos = sheetToObjects('campeonatos');
   const campeonatoExiste = campeonatos.some(function (c) {
     return c.id === INITIAL_CAMPEONATO_ID;
@@ -102,18 +120,20 @@ function asegurarDatosBase_() {
       createdAt: new Date().toISOString()
     });
   }
+}
 
+function asegurarDisciplinaBase_(disciplinaId, disciplinaNombre, categoria) {
   const disciplinas = sheetToObjects('disciplinas');
   const disciplinaExiste = disciplinas.some(function (d) {
-    return d.id === INITIAL_DISCIPLINA_ID;
+    return d.id === disciplinaId;
   });
 
   if (!disciplinaExiste) {
     appendRow('disciplinas', {
-      id: INITIAL_DISCIPLINA_ID,
+      id: disciplinaId,
       campeonatoId: INITIAL_CAMPEONATO_ID,
-      nombre: 'VOLEIBOL',
-      categorias: 'Sub14',
+      nombre: disciplinaNombre,
+      categorias: categoria,
       estado: 'activo'
     });
   }

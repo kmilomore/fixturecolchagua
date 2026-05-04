@@ -212,7 +212,9 @@ function validateMutationPayload_(resource, action, payload) {
     case 'import':
       ensureActionAllowed_(action, ['migrate']);
       ensureStringField_(payload, 'campeonatoId');
-      ensureStringField_(payload, 'disciplinaId');
+      if (!payload.multiDisciplina) {
+        ensureStringField_(payload, 'disciplinaId');
+      }
       return;
 
     default:
