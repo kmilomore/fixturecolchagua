@@ -523,10 +523,11 @@ export function KioscoPage() {
 
   const visibleUpcomingMatches = useMemo(() => {
     if (!isFullscreen) return scopedProximos
+    if (viewportSize.height < 1100) return scopedProximos.slice(0, 1)
     if (isUltraCompactFullscreen) return scopedProximos.slice(0, 1)
-    if (isCompactFullscreen) return scopedProximos.slice(0, 2)
+    if (isCompactFullscreen) return scopedProximos.slice(0, 1)
     return scopedProximos.slice(0, 2)
-  }, [isCompactFullscreen, isFullscreen, isUltraCompactFullscreen, scopedProximos])
+  }, [isCompactFullscreen, isFullscreen, isUltraCompactFullscreen, scopedProximos, viewportSize.height])
 
   const visibleRecentResults = useMemo(() => {
     if (!isFullscreen) return resultadosRecientes
@@ -1002,11 +1003,11 @@ export function KioscoPage() {
               </CardContent>
             </Card>
 
-            <Card className={`border-white/20 bg-white/95 shadow-2xl ${isFullscreen ? 'h-full xl:col-span-5' : 'xl:col-span-2'}`}>
-              <CardHeader>
+            <Card className={`border-white/20 bg-white/95 shadow-2xl ${isFullscreen ? 'flex h-full min-h-0 flex-col xl:col-span-5' : 'xl:col-span-2'}`}>
+              <CardHeader className={isFullscreen ? 'pb-3' : undefined}>
                 <CardTitle className={`font-display text-primary ${isUltraCompactFullscreen ? 'text-2xl' : 'text-3xl'}`}>Próximos encuentros</CardTitle>
               </CardHeader>
-              <CardContent className={`grid min-h-0 content-start overflow-hidden auto-rows-min gap-2 ${upcomingGridClass}`}>
+              <CardContent className={`grid flex-1 min-h-0 content-start overflow-hidden auto-rows-min gap-2 ${upcomingGridClass}`}>
                 {visibleUpcomingMatches.length ? (
                   visibleUpcomingMatches.map((p) => (
                     <div key={p.id} className={`rounded-xl border border-primary/10 bg-white ${upcomingCardPaddingClass} ${updatedMatchIds.includes(p.id) ? 'ring-2 ring-emerald-300/70' : ''}`}>
