@@ -175,7 +175,7 @@ Proveedor actual:
 Open-Meteo
 ```
 
-URL configurada actualmente para:
+Ubicación configurada actualmente para:
 
 ```txt
 San Fernando, Chile
@@ -188,6 +188,14 @@ Uso:
 - máxima/mínima,
 - probabilidad de lluvia,
 - viento.
+
+Implementación actual:
+
+- el frontend no consulta Open-Meteo de forma directa en producción,
+- consume una ruta propia ` /api/weather ` del mismo origen,
+- esa ruta serverless consulta Open-Meteo y devuelve JSON normalizado al navegador,
+- esto evita bloqueos por CSP en `connect-src`,
+- y mantiene el kiosco desacoplado del backend GAS.
 
 Importante:
 
@@ -212,6 +220,8 @@ El módulo está diseñado para verse “vivo” sin saturar APIs.
 
 - `weather`: refresh cada 15 minutos.
 - `staleTime`: 10 minutos.
+- timeout de consulta en frontend: 8 segundos.
+- timeout del proxy serverless: 6 segundos.
 
 ### Reloj local
 
@@ -304,6 +314,23 @@ El módulo genera avisos básicos a partir de la jornada actual, por ejemplo:
 
 No son alertas manuales del admin todavía. Son alertas **derivadas del estado real de la jornada**.
 
+### 8. Resiliencia visible del clima
+
+La meteorología ya no desaparece en silencio cuando falla.
+
+Hoy el kiosco distingue explícitamente entre:
+
+- clima cargando,
+- clima disponible,
+- clima no disponible,
+- y error por timeout.
+
+Además:
+
+- la consulta meteorológica no reintenta indefinidamente,
+- el error deja advertencia en consola para diagnóstico,
+- y la UI mantiene el bloque visible con fallback para no romper la composición general.
+
 ---
 
 ## Configuración del operador
@@ -362,7 +389,8 @@ Hoy el comportamiento esperado es:
 - densidad visual mayor,
 - grilla principal más compacta,
 - menos ítems visibles por bloque,
-- tarjetas distribuidas para que las áreas clave entren mejor en una sola vista.
+- tarjetas distribuidas para que las áreas clave entren mejor en una sola vista,
+- y ausencia de scroll vertical durante el modo kiosco fullscreen.
 
 ### Ajustes que hace el módulo en fullscreen
 
@@ -372,13 +400,49 @@ Hoy el comportamiento esperado es:
 - limita `Resultados recientes`,
 - limita `Próximos encuentros`,
 - reorganiza paneles en una grilla más estable,
-- evita que listas largas empujen contenido crítico fuera de la pantalla.
+- reduce tamaño tipográfico en resoluciones más bajas,
+- activa modos compactos según ancho/alto real del viewport,
+- y evita que listas largas empujen contenido crítico fuera de la pantalla.
+
+### Estrategia actual de fullscreen
+
+La implementación actual usa una estrategia explícita de **canvas fijo**:
+
+- el contenedor fullscreen ocupa `100dvh`,
+- el shell principal usa `overflow-hidden`,
+- la grilla principal se reparte en dos filas controladas,
+- y cada tarjeta ocupa una fracción del alto disponible en lugar de crecer libremente.
+
+Esto es intencional. El módulo no se comporta como una página tradicional, sino como una pantalla operativa cerrada.
+
+### Compactación automática por resolución
+
+El kiosco aplica al menos dos niveles de compactación cuando detecta pantallas más exigentes:
+
+- `compact fullscreen`
+- `ultra compact fullscreen`
+
+Estos modos ajustan automáticamente:
+
+- padding exterior,
+- tamaño del logo,
+- tamaño del hero,
+- tamaño del marcador,
+- cantidad visible de partidos por bloque,
+- y densidad del panel rotativo.
 
 Esto no garantiza matemáticamente que toda combinación de datos entre en cualquier resolución, pero sí establece una estrategia práctica y escalable para pantallas grandes.
 
 ### Limitación realista
 
-Si la resolución es muy baja o si los nombres de equipos son excesivamente largos, puede seguir haciendo falta un modo aún más compacto.
+Si la resolución es muy baja o si los nombres de equipos son excesivamente largos, el kiosco prioriza recortar densidad y cantidad de tarjetas visibles antes que permitir scroll.
+
+Eso implica una decisión consciente de producto:
+
+- es preferible mostrar menos elementos,
+- pero mantener integridad visual,
+- jerarquía,
+- y lectura limpia a distancia.
 
 Esa extensión futura podría llamarse, por ejemplo:
 
@@ -445,6 +509,8 @@ Sirve para:
 
 La rotación automática usa `setInterval` controlado por `rotationSeconds`.
 
+Además, la transición visible del panel fue suavizada para que el cambio de bloque no se sienta abrupto.
+
 Eso permite transformar el kiosco en un sistema autoexplicativo aunque nadie lo opere manualmente.
 
 ---
@@ -475,7 +541,7 @@ Open-Meteo
 - sin API key para este uso,
 - suficientemente estable,
 - respuesta JSON simple,
-- adecuada para consumo directo desde frontend.
+- adecuada para consumo vía proxy ligero del mismo origen.
 
 ### Datos visibles hoy
 
@@ -484,6 +550,13 @@ Open-Meteo
 - máxima / mínima,
 - probabilidad de lluvia,
 - velocidad del viento.
+
+También existe feedback operativo visible cuando falla:
+
+- badge de clima no disponible,
+- bloque meteorológico con fallback,
+- mensaje de error o espera controlada,
+- y warning de consola para diagnóstico técnico.
 
 ### Relación con el fixture
 
@@ -524,6 +597,7 @@ Sin esos datos limpios, el kiosco perdería claridad operativa.
 ### Archivos directamente implicados
 
 - `src/pages/KioscoPage.tsx`
+- `api/weather.ts`
 - `src/api/gasClient.ts`
 - `src/utils/formatDate.ts`
 - `src/utils/matches.ts`
@@ -539,6 +613,7 @@ Sin esos datos limpios, el kiosco perdería claridad operativa.
 - `lucide-react` para iconografía.
 - `localStorage` para configuración del operador.
 - `Fullscreen API` del navegador para modo inmersivo.
+- función serverless propia para proxy meteorológico.
 
 ---
 
@@ -551,6 +626,8 @@ El kiosco maneja varios estados simultáneos:
 - carga de resumen,
 - carga de partidos completos,
 - carga de clima,
+- timeout de clima,
+- error de clima visible,
 - estado visual fullscreen,
 - estado del panel rotativo,
 - cambios recientes detectados,
@@ -575,6 +652,12 @@ Por eso:
 
 Si los nombres crecen demasiado, pueden tensar el layout, especialmente en fullscreen con mucha información simultánea.
 
+La mitigación actual incluye:
+
+- `line-clamp` en zonas sensibles,
+- compactación tipográfica progresiva,
+- y reducción de tarjetas visibles en bloques secundarios.
+
 ### 3. Meteorología externa
 
 Open-Meteo es externa al backend de fixture.
@@ -582,9 +665,20 @@ Open-Meteo es externa al backend de fixture.
 Si falla:
 
 - el kiosco debe seguir funcionando,
+- el proxy `/api/weather` debe fallar rápido,
+- el frontend debe salir de `loading` y mostrar fallback,
 - y el clima debe considerarse complemento, no dependencia crítica.
 
-### 4. Advertencia de chunk grande
+### 4. CSP y consumo externo
+
+Como el frontend público opera con políticas de seguridad restrictivas, la consulta meteorológica directa desde navegador puede romperse por `Content-Security-Policy`.
+
+La mitigación implementada fue:
+
+- permitir `api.open-meteo.com` en la CSP de despliegue,
+- y además mover la consulta real a una ruta same-origin `/api/weather`.
+
+### 5. Advertencia de chunk grande
 
 La build actual del frontend ya reporta advertencias por tamaño de chunk. El kiosco agrega bastante UI y lógica en un solo archivo, por lo que es candidato natural para futura división si el bundle sigue creciendo.
 
@@ -597,11 +691,12 @@ Extensiones que encajan naturalmente con este módulo:
 - clima por sede o recinto.
 - alertas meteorológicas por umbral.
 - mensajes operativos manuales desde admin.
-- modo ultra compacto para resoluciones menores.
+- modo ultra compacto más agresivo para resoluciones menores.
 - URL compartible con configuración del operador.
 - ticker inferior continuo.
 - integración con tablas de grupo del partido destacado.
 - integración con llave eliminatoria cuando el partido sea de fases finales.
+- compactación selectiva adicional para `Próximos encuentros` y paneles secundarios según resolución.
 
 ---
 

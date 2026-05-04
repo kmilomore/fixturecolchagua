@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
-import type { Partido } from '@/types'
+import type { Equipo, Partido } from '@/types'
 import { formatPartidoDateKey, formatPartidoDateLabel, formatPartidoTime } from '@/utils/formatDate'
 import { sortMatches } from '@/utils/matches'
 
@@ -23,6 +23,7 @@ type RotatingPanel = (typeof ROTATING_PANELS)[number]
 
 interface KioskSettings {
   fixedDisciplineId: string
+  fixedSchoolName: string
   rotationSeconds: number
   autoFullscreen: boolean
 }
@@ -91,6 +92,7 @@ async function fetchWeather(): Promise<OpenMeteoResponse> {
 function getDefaultKioskSettings(): KioskSettings {
   return {
     fixedDisciplineId: 'all',
+    fixedSchoolName: 'all',
     rotationSeconds: 12,
     autoFullscreen: false,
   }
@@ -106,6 +108,7 @@ function readStoredKioskSettings(): KioskSettings {
     const parsed = JSON.parse(raw) as Partial<KioskSettings>
     return {
       fixedDisciplineId: typeof parsed.fixedDisciplineId === 'string' && parsed.fixedDisciplineId ? parsed.fixedDisciplineId : 'all',
+      fixedSchoolName: typeof parsed.fixedSchoolName === 'string' && parsed.fixedSchoolName ? parsed.fixedSchoolName : 'all',
       rotationSeconds: Number(parsed.rotationSeconds) >= 5 ? Number(parsed.rotationSeconds) : 12,
       autoFullscreen: Boolean(parsed.autoFullscreen),
     }
@@ -218,6 +221,10 @@ function buildOperationalNotes(partidos: Partido[], highlighted: Partido | null)
   return notes.slice(0, 4)
 }
 
+function getSchoolName(equipo: Equipo) {
+  return (equipo.establecimiento || equipo.nombre || '').trim()
+}
+
 function KioscoClock() {
   const [clock, setClock] = useState(new Date())
 
@@ -321,8 +328,31 @@ export function KioscoPage() {
       ? kioskSettings.fixedDisciplineId
       : undefined
 
-  const visibleDisciplineLabel =
-    effectiveDisciplineId ? disciplinas.find((disciplina) => disciplina.id === effectiveDisciplineId)?.nombre || 'Disciplina fija' : 'Todas las disciplinas'
+  const equiposQ = useQuery({
+    queryKey: ['equipos', campeonato?.id, effectiveDisciplineId, 'kiosco'],
+    queryFn: () => api.equipos.getByCampeonato(campeonato!.id),
+    enabled: hasGasUrl && Boolean(campeonato?.id),
+    staleTime: 5 * 60 * 1000,
+  })
+
+  const equipos = useMemo(() => {
+    const rows = equiposQ.data || []
+    return effectiveDisciplineId ? rows.filter((equipo) => equipo.disciplinaId === effectiveDisciplineId) : rows
+  }, [effectiveDisciplineId, equiposQ.data])
+
+  const schoolOptions = useMemo(() => {
+    return [...new Set(equipos.map(getSchoolName).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'))
+  }, [equipos])
+
+  const effectiveSchoolName =
+    kioskSettings.fixedSchoolName !== 'all' && schoolOptions.includes(kioskSettings.fixedSchoolName)
+      ? kioskSettings.fixedSchoolName
+      : 'all'
+
+  const selectedSchoolTeamIds = useMemo(() => {
+    if (effectiveSchoolName === 'all') return new Set<string>()
+    return new Set(equipos.filter((equipo) => getSchoolName(equipo) === effectiveSchoolName).map((equipo) => equipo.id))
+  }, [effectiveSchoolName, equipos])
 
   const partidosQ = useQuery({
     queryKey: ['partidos', campeonato?.id, effectiveDisciplineId, 'resumen-kiosco'],
@@ -356,15 +386,19 @@ export function KioscoPage() {
   }, [partidosQ.data])
 
   const allMatches = useMemo(() => allMatchesQ.data || [], [allMatchesQ.data])
+  const schoolFilteredMatches = useMemo(() => {
+    if (effectiveSchoolName === 'all') return allMatches
+    return allMatches.filter((partido) => selectedSchoolTeamIds.has(partido.localId) || selectedSchoolTeamIds.has(partido.visitaId))
+  }, [allMatches, effectiveSchoolName, selectedSchoolTeamIds])
 
   useEffect(() => {
-    if (!allMatches.length) {
+    if (!schoolFilteredMatches.length) {
       previousSnapshotRef.current = new Map()
       return
     }
 
     const nextSnapshot = new Map(
-      allMatches.map((partido) => [
+      schoolFilteredMatches.map((partido) => [
         partido.id,
         [partido.estado, partido.marcadorLocal, partido.marcadorVisita, partido.hora, partido.lugar].join('|'),
       ]),
@@ -376,7 +410,7 @@ export function KioscoPage() {
       return
     }
 
-    const changedIds = allMatches
+    const changedIds = schoolFilteredMatches
       .filter((partido) => previousSnapshot.get(partido.id) && previousSnapshot.get(partido.id) !== nextSnapshot.get(partido.id))
       .map((partido) => partido.id)
 
@@ -395,7 +429,7 @@ export function KioscoPage() {
       setUpdatedMatchIds([])
       setChangePulse(null)
     }, 15000)
-  }, [allMatches])
+  }, [schoolFilteredMatches])
 
   useEffect(() => {
     return () => {
@@ -407,41 +441,63 @@ export function KioscoPage() {
 
   const partidosDeHoy = useMemo(() => {
     const todayKey = formatPartidoDateKey(new Date(now).toISOString())
-    return allMatches
+    return schoolFilteredMatches
       .filter((partido) => formatPartidoDateKey(partido.fecha) === todayKey)
       .sort(smartTodaySort)
-  }, [allMatches, now])
+  }, [now, schoolFilteredMatches])
 
   const partidoEnCurso = useMemo(
     () => partidosDeHoy.find((partido) => partido.estado === 'en_curso') || null,
     [partidosDeHoy],
   )
 
-  const partidoDestacado = partidoEnCurso || siguiente
+  const fallbackUpcomingMatches = useMemo(() => {
+    return [...schoolFilteredMatches]
+      .filter((partido) => partido.estado !== 'finalizado' && partido.estado !== 'postergado')
+      .sort((a, b) => partidoTimestamp(a).localeCompare(partidoTimestamp(b)))
+  }, [schoolFilteredMatches])
+
+  const schoolSiguiente = useMemo(() => {
+    const currentTime = new Date(now).toISOString()
+    return (
+      fallbackUpcomingMatches.find((partido) => partido.estado === 'programado' && partidoTimestamp(partido) >= currentTime) ||
+      fallbackUpcomingMatches.find((partido) => partido.estado === 'programado') ||
+      fallbackUpcomingMatches[0] ||
+      null
+    )
+  }, [fallbackUpcomingMatches, now])
+
+  const scopedSiguiente = effectiveSchoolName === 'all' ? siguiente : schoolSiguiente
+  const scopedProximos = useMemo(() => {
+    if (effectiveSchoolName === 'all') return proximos
+    return fallbackUpcomingMatches.filter((partido) => partido.id !== schoolSiguiente?.id).slice(0, 6)
+  }, [effectiveSchoolName, fallbackUpcomingMatches, proximos, schoolSiguiente])
+
+  const partidoDestacado = partidoEnCurso || scopedSiguiente
 
   const resultadosRecientes = useMemo(() => {
-    return [...allMatches]
+    return [...schoolFilteredMatches]
       .filter((partido) => partido.estado === 'finalizado')
       .sort((a, b) => partidoTimestamp(b).localeCompare(partidoTimestamp(a)))
       .slice(0, 6)
-  }, [allMatches])
+  }, [schoolFilteredMatches])
 
   const proximoMismoRecinto = useMemo(() => {
     if (!partidoDestacado?.lugar) return null
-    return [...allMatches]
+    return [...schoolFilteredMatches]
       .filter((partido) => {
         if (partido.id === partidoDestacado.id) return false
         if (partido.lugar !== partidoDestacado.lugar) return false
         if (partido.estado === 'finalizado' || partido.estado === 'postergado') return false
         return partidoTimestamp(partido) > partidoTimestamp(partidoDestacado)
       })
-      .sort((a, b) => partidoTimestamp(a).localeCompare(partidoTimestamp(b)))[0] || null
-  }, [allMatches, partidoDestacado])
+        .sort((a, b) => partidoTimestamp(a).localeCompare(partidoTimestamp(b)))[0] || null
+      }, [partidoDestacado, schoolFilteredMatches])
 
   const historialCruce = useMemo(() => {
     if (!partidoDestacado) return [] as Partido[]
 
-    return [...allMatches]
+    return [...schoolFilteredMatches]
       .filter((partido) => {
         if (partido.id === partidoDestacado.id) return false
         if (partido.estado !== 'finalizado') return false
@@ -450,9 +506,9 @@ export function KioscoPage() {
         const oppositeDirection = partido.localId === partidoDestacado.visitaId && partido.visitaId === partidoDestacado.localId
         return sameDirection || oppositeDirection
       })
-      .sort((a, b) => partidoTimestamp(b).localeCompare(partidoTimestamp(a)))
-      .slice(0, 3)
-  }, [allMatches, partidoDestacado])
+        .sort((a, b) => partidoTimestamp(b).localeCompare(partidoTimestamp(a)))
+        .slice(0, 3)
+      }, [partidoDestacado, schoolFilteredMatches])
 
   const avisosOperativos = useMemo(() => buildOperationalNotes(partidosDeHoy, partidoDestacado), [partidosDeHoy, partidoDestacado])
   const isCompactFullscreen = isFullscreen && (viewportSize.height < 940 || viewportSize.width < 1600)
@@ -466,11 +522,11 @@ export function KioscoPage() {
   }, [isCompactFullscreen, isFullscreen, isUltraCompactFullscreen, partidosDeHoy])
 
   const visibleUpcomingMatches = useMemo(() => {
-    if (!isFullscreen) return proximos
-    if (isUltraCompactFullscreen) return proximos.slice(0, 2)
-    if (isCompactFullscreen) return proximos.slice(0, 3)
-    return proximos.slice(0, 4)
-  }, [isCompactFullscreen, isFullscreen, isUltraCompactFullscreen, proximos])
+    if (!isFullscreen) return scopedProximos
+    if (isUltraCompactFullscreen) return scopedProximos.slice(0, 1)
+    if (isCompactFullscreen) return scopedProximos.slice(0, 2)
+    return scopedProximos.slice(0, 2)
+  }, [isCompactFullscreen, isFullscreen, isUltraCompactFullscreen, scopedProximos])
 
   const visibleRecentResults = useMemo(() => {
     if (!isFullscreen) return resultadosRecientes
@@ -589,9 +645,9 @@ export function KioscoPage() {
   const upcomingGridClass = isUltraCompactFullscreen
     ? 'md:grid-cols-1 xl:grid-cols-1'
     : isCompactFullscreen
-      ? 'md:grid-cols-1 xl:grid-cols-2'
+      ? 'md:grid-cols-1 xl:grid-cols-1'
       : isFullscreen
-        ? 'md:grid-cols-2 xl:grid-cols-2'
+        ? 'md:grid-cols-1 xl:grid-cols-1'
         : 'md:grid-cols-2 xl:grid-cols-4'
 
   const relativeUpdatedText = getRelativeUpdateText(partidosQ.data?.updatedAt, now)
@@ -668,32 +724,28 @@ export function KioscoPage() {
           </div>
         </header>
 
-        <div className={`flex flex-wrap items-center gap-2 rounded-2xl border border-white/15 bg-white/10 backdrop-blur-sm ${isUltraCompactFullscreen ? 'p-2' : isFullscreen ? 'p-2.5' : 'p-3'}`}>
-          <Badge className="border border-white/15 bg-white/5 px-3 py-1 text-white">Disciplina visible</Badge>
-          <Badge className="border border-white/15 bg-white/5 px-3 py-1 text-white">{visibleDisciplineLabel}</Badge>
-          <Badge className="border border-white/15 bg-white/5 px-3 py-1 text-white">Rotación {kioskSettings.rotationSeconds}s</Badge>
-          {kioskSettings.autoFullscreen ? <Badge className="border border-white/15 bg-white/5 px-3 py-1 text-white">Fullscreen auto</Badge> : null}
-          <Button
-            type="button"
-            size="sm"
-            variant={kioskSettings.fixedDisciplineId === 'all' ? 'secondary' : 'outline'}
-            className={kioskSettings.fixedDisciplineId === 'all' ? 'bg-white text-primary' : 'border-white/25 bg-transparent text-white hover:bg-white/10'}
-            onClick={() => setKioskSettings((current) => ({ ...current, fixedDisciplineId: 'all' }))}
-          >
-            Todas
-          </Button>
-          {disciplinas.map((disciplina) => (
-            <Button
-              key={disciplina.id}
-              type="button"
-              size="sm"
-              variant={kioskSettings.fixedDisciplineId === disciplina.id ? 'secondary' : 'outline'}
-              className={kioskSettings.fixedDisciplineId === disciplina.id ? 'bg-white text-primary' : 'border-white/25 bg-transparent text-white hover:bg-white/10'}
-              onClick={() => setKioskSettings((current) => ({ ...current, fixedDisciplineId: disciplina.id }))}
-            >
-              {disciplina.nombre}
-            </Button>
-          ))}
+        <div className={`rounded-2xl border border-white/15 bg-white/10 backdrop-blur-sm ${isUltraCompactFullscreen ? 'p-2' : isFullscreen ? 'p-2.5' : 'p-3'}`}>
+          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/65">Escuela visible</p>
+              <p className="mt-1 text-sm font-medium text-white/90">{effectiveSchoolName === 'all' ? 'Vista general del campeonato' : effectiveSchoolName}</p>
+            </div>
+            <div className="w-full md:max-w-[420px]">
+              <select
+                aria-label="Seleccionar escuela para kiosco"
+                className="h-10 w-full rounded-xl border border-white/15 bg-slate-950/35 px-3 text-sm text-white outline-none transition focus:border-white/35"
+                value={effectiveSchoolName}
+                onChange={(e) => setKioskSettings((current) => ({ ...current, fixedSchoolName: e.target.value }))}
+              >
+                <option value="all">Todas las escuelas</option>
+                {schoolOptions.map((schoolName) => (
+                  <option key={schoolName} value={schoolName}>
+                    {schoolName}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
 
         <div className={`grid gap-3 ${isUltraCompactFullscreen ? 'grid-cols-2 xl:grid-cols-4' : 'grid-cols-2 md:grid-cols-4'}`}>
@@ -954,7 +1006,7 @@ export function KioscoPage() {
               <CardHeader>
                 <CardTitle className={`font-display text-primary ${isUltraCompactFullscreen ? 'text-2xl' : 'text-3xl'}`}>Próximos encuentros</CardTitle>
               </CardHeader>
-              <CardContent className={`grid auto-rows-min gap-2.5 ${upcomingGridClass}`}>
+              <CardContent className={`grid min-h-0 content-start overflow-hidden auto-rows-min gap-2 ${upcomingGridClass}`}>
                 {visibleUpcomingMatches.length ? (
                   visibleUpcomingMatches.map((p) => (
                     <div key={p.id} className={`rounded-xl border border-primary/10 bg-white ${upcomingCardPaddingClass} ${updatedMatchIds.includes(p.id) ? 'ring-2 ring-emerald-300/70' : ''}`}>
@@ -990,6 +1042,23 @@ export function KioscoPage() {
           </DialogHeader>
 
           <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="kiosk-school">Escuela visible en kiosco</Label>
+              <select
+                id="kiosk-school"
+                className="h-10 w-full rounded-lg border border-black/10 bg-white px-3 text-sm"
+                value={effectiveSchoolName}
+                onChange={(e) => setKioskSettings((current) => ({ ...current, fixedSchoolName: e.target.value }))}
+              >
+                <option value="all">Todas las escuelas</option>
+                {schoolOptions.map((schoolName) => (
+                  <option key={schoolName} value={schoolName}>
+                    {schoolName}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="kiosk-discipline">Disciplina fija</Label>
               <select
