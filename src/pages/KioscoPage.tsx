@@ -495,6 +495,12 @@ export function KioscoPage() {
       ? 'max-w-[1900px] gap-3 px-[clamp(12px,1.5vw,22px)] py-[clamp(12px,1.5vh,20px)]'
       : 'max-w-[1920px] gap-3 px-[clamp(16px,1.8vw,28px)] py-[clamp(14px,1.8vh,24px)]'
 
+  const fullscreenMainGridClass = isUltraCompactFullscreen
+    ? 'flex-1 min-h-0 gap-2 xl:grid-cols-12 xl:grid-rows-[minmax(0,1.12fr)_minmax(0,0.88fr)]'
+    : isCompactFullscreen
+      ? 'flex-1 min-h-0 gap-3 xl:grid-cols-12 xl:grid-rows-[minmax(0,1.15fr)_minmax(0,0.85fr)]'
+      : 'flex-1 min-h-0 gap-3 xl:grid-cols-12 xl:grid-rows-[minmax(0,1.2fr)_minmax(0,0.8fr)] 2xl:gap-4'
+
   const heroTitleClass = isUltraCompactFullscreen
     ? 'text-2xl md:text-3xl'
     : isCompactFullscreen
@@ -541,7 +547,7 @@ export function KioscoPage() {
   if (!hasGasUrl) return <p className="p-6 text-muted">Configura VITE_GAS_URL.</p>
 
   return (
-    <div ref={containerRef} className="relative min-h-dvh overflow-x-hidden overflow-y-auto bg-slate-950 text-white">
+    <div ref={containerRef} className="relative min-h-dvh overflow-hidden bg-slate-950 text-white">
       <div
         className="absolute inset-0 bg-cover bg-center bg-no-repeat"
         style={{ backgroundImage: "url('/auth.webp')" }}
@@ -552,7 +558,7 @@ export function KioscoPage() {
       <div
         className={`relative mx-auto flex min-h-dvh w-full flex-col ${
           isFullscreen
-            ? fullscreenPaddingClass
+            ? `h-dvh overflow-hidden ${fullscreenPaddingClass}`
             : 'max-w-[1800px] gap-6 p-4 md:p-8'
         }`}
       >
@@ -652,15 +658,15 @@ export function KioscoPage() {
             </CardHeader>
           </Card>
         ) : (
-          <div className={`grid min-h-0 content-start ${isFullscreen ? 'gap-3 xl:grid-cols-12 2xl:gap-4' : 'gap-6 xl:grid-cols-[1.25fr_0.75fr]'}`}>
-            <Card className={`self-start border-white/20 bg-white/95 shadow-2xl transition-all duration-500 ${partidoEnCurso ? 'ring-4 ring-emerald-300/60 shadow-emerald-200/50' : ''} ${isFullscreen ? 'xl:col-span-7' : ''}`}>
+          <div className={`grid min-h-0 ${isFullscreen ? fullscreenMainGridClass : 'gap-6 xl:grid-cols-[1.25fr_0.75fr]'}`}>
+            <Card className={`border-white/20 bg-white/95 shadow-2xl transition-all duration-500 ${partidoEnCurso ? 'ring-4 ring-emerald-300/60 shadow-emerald-200/50' : ''} ${isFullscreen ? 'h-full xl:col-span-7' : ''}`}>
               <CardHeader>
                 <CardTitle className={`flex items-center gap-2 font-display text-primary ${isUltraCompactFullscreen ? 'text-2xl' : 'text-3xl'}`}>
                   <Activity className="h-5 w-5" />
                   {partidoEnCurso ? 'Partido en vivo' : 'Próximo partido'}
                 </CardTitle>
               </CardHeader>
-              <CardContent className={isFullscreen ? (isUltraCompactFullscreen ? 'space-y-3' : 'space-y-4') : ''}>
+              <CardContent className={isFullscreen ? `min-h-0 overflow-hidden ${isUltraCompactFullscreen ? 'space-y-3' : 'space-y-4'}` : ''}>
                 {partidoDestacado ? (
                   <div className={`transition-all duration-500 ${isUltraCompactFullscreen ? 'space-y-3' : isFullscreen ? 'space-y-4' : 'space-y-6'} ${partidoEnCurso ? 'rounded-2xl bg-[radial-gradient(circle_at_top,rgba(16,185,129,0.18),transparent_55%)] p-2' : ''}`}>
                     <div className="flex flex-wrap gap-2">
@@ -713,14 +719,14 @@ export function KioscoPage() {
               </CardContent>
             </Card>
 
-            <Card className={`self-start border-white/20 bg-white/95 shadow-2xl ${isFullscreen ? 'xl:col-span-5' : ''}`}>
+            <Card className={`border-white/20 bg-white/95 shadow-2xl ${isFullscreen ? 'h-full xl:col-span-5' : ''}`}>
               <CardHeader>
                 <CardTitle className={`flex items-center gap-2 font-display text-primary ${isUltraCompactFullscreen ? 'text-2xl' : 'text-3xl'}`}>
                   <Clock className="h-5 w-5" />
                   Partidos de hoy
                 </CardTitle>
               </CardHeader>
-              <CardContent className={`space-y-3 ${isFullscreen ? 'min-h-0' : ''}`}>
+              <CardContent className={`space-y-3 ${isFullscreen ? 'min-h-0 overflow-hidden' : ''}`}>
                 {visibleTodayMatches.length ? (
                   <div className="stagger-children space-y-3">
                     {visibleTodayMatches.map((p) => (
@@ -746,7 +752,7 @@ export function KioscoPage() {
               </CardContent>
             </Card>
 
-            <Card className={`self-start border-white/20 bg-white/95 shadow-2xl ${isFullscreen ? 'xl:col-span-7' : 'xl:col-span-2'}`}>
+            <Card className={`border-white/20 bg-white/95 shadow-2xl ${isFullscreen ? 'h-full xl:col-span-7' : 'xl:col-span-2'}`}>
               <CardHeader>
                 <CardTitle className={`font-display text-primary ${isUltraCompactFullscreen ? 'text-2xl' : 'text-3xl'}`}>Próximos encuentros</CardTitle>
                 <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
@@ -766,7 +772,7 @@ export function KioscoPage() {
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className={`overflow-hidden ${isFullscreen ? 'min-h-0' : ''}`}>
+              <CardContent className={`overflow-hidden ${isFullscreen ? 'flex h-full min-h-0 flex-col' : ''}`}>
                 <div key={activePanel} className={`animate-fade-up transition-all duration-700 ${isUltraCompactFullscreen ? 'min-h-[220px]' : isCompactFullscreen ? 'min-h-[260px]' : isFullscreen ? 'min-h-[320px]' : 'min-h-[260px]'}`}>
                 {activePanel === 'timeline' ? (
                   <div className="space-y-4">
@@ -881,7 +887,7 @@ export function KioscoPage() {
               </CardContent>
             </Card>
 
-            <Card className={`self-start border-white/20 bg-white/95 shadow-2xl ${isFullscreen ? 'xl:col-span-5' : 'xl:col-span-2'}`}>
+            <Card className={`border-white/20 bg-white/95 shadow-2xl ${isFullscreen ? 'h-full xl:col-span-5' : 'xl:col-span-2'}`}>
               <CardHeader>
                 <CardTitle className={`font-display text-primary ${isUltraCompactFullscreen ? 'text-2xl' : 'text-3xl'}`}>Próximos encuentros</CardTitle>
               </CardHeader>
