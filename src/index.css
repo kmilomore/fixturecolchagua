@@ -1,0 +1,58 @@
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@600;700&family=DM+Sans:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-primary: #25306b;
+  --color-secondary: #006bb9;
+  --color-accent: #ff1d3d;
+  --color-surface: #edf0f5;
+  --color-card: #ffffff;
+  --color-text: #1a1a2e;
+  --color-muted: #6b7280;
+  --gradient-hero: linear-gradient(135deg, #25306b 0%, #2c3d9e 100%);
+  --gradient-brand: linear-gradient(135deg, #25306b 0%, #006bb9 100%);
+  --gradient-alert: linear-gradient(135deg, #ff1d3d 0%, #edf0f5 100%);
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  color: var(--color-text);
+  background: var(--color-surface);
+}
+
+@layer utilities {
+  .stagger-children > * {
+    animation: fade-up 0.45s ease-out both;
+  }
+  .stagger-children > *:nth-child(1) {
+    animation-delay: 0.02s;
+  }
+  .stagger-children > *:nth-child(2) {
+    animation-delay: 0.06s;
+  }
+  .stagger-children > *:nth-child(3) {
+    animation-delay: 0.1s;
+  }
+  .stagger-children > *:nth-child(4) {
+    animation-delay: 0.14s;
+  }
+  .stagger-children > *:nth-child(5) {
+    animation-delay: 0.18s;
+  }
+  .stagger-children > *:nth-child(6) {
+    animation-delay: 0.22s;
+  }
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}

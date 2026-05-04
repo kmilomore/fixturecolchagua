@@ -1,0 +1,233 @@
+import { useQuery } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
+import { api } from '@/api/gasClient'
+import { hasGasUrl } from '@/config'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Badge } from '@/components/ui/badge'
+import { MatchCard } from '@/components/MatchCard'
+import { formatPartidoDateKey, formatPartidoTime } from '@/utils/formatDate'
+import { getTodayMatches, getUpcomingMatch } from '@/utils/matches'
+
+export function HomePage() {
+  const q = useQuery({
+    queryKey: ['campeonatos'],
+    queryFn: () => api.campeonatos.getAll(),
+    enabled: hasGasUrl,
+    staleTime: 5 * 60 * 1000,
+  })
+  const activos = (q.data || []).filter((c) => c.estado === 'activo')
+  const destacado = activos[0] || q.data?.[0]
+
+  const partidosQ = useQuery({
+    queryKey: ['partidos', destacado?.id, 'home'],
+    queryFn: () => api.partidos.query({ campeonatoId: destacado!.id }),
+    enabled: hasGasUrl && Boolean(destacado?.id),
+    staleTime: 5 * 60 * 1000,
+  })
+
+  if (!hasGasUrl) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Configura la API</CardTitle>
+          <CardDescription>
+            Crea <code className="rounded bg-black/5 px-1">frontend/.env.local</code> con{' '}
+            <code className="rounded bg-black/5 px-1">VITE_GAS_URL</code> apuntando a tu Web App de Google Apps Script.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button asChild variant="outline">
+            <a href="https://developers.google.com/apps-script/guides/web">Guía Web App</a>
+          </Button>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (q.isLoading) {
+    return (
+      <div className="space-y-3">
+        <Skeleton className="h-10 w-64" />
+        <Skeleton className="h-40 w-full" />
+      </div>
+    )
+  }
+
+  if (q.isError) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>No se pudo cargar</CardTitle>
+          <CardDescription>{(q.error as Error).message}</CardDescription>
+        </CardHeader>
+      </Card>
+    )
+  }
+
+  const siguiente = getUpcomingMatch(partidosQ.data || [])
+  const hoy = getTodayMatches(partidosQ.data || [])
+
+  return (
+    <div className="space-y-8">
+      <section className="overflow-hidden rounded-2xl border border-white/10 bg-[image:var(--gradient-brand)] p-[1px] shadow-sm">
+        <div className="rounded-2xl bg-[image:var(--gradient-brand)] px-6 py-10 text-white">
+          <div className="flex flex-col gap-6 md:flex-row md:items-center">
+            <div className="grid h-24 w-24 shrink-0 place-items-center rounded-2xl bg-white p-3 shadow-lg">
+              <img src="/SLEPCOLCHAGUA.webp" alt="SLEP Colchagua" className="h-full w-full object-contain" />
+            </div>
+            <div>
+              <p className="font-display text-3xl font-semibold tracking-wide md:text-4xl">Campeonato Deportivo</p>
+              <p className="mt-2 max-w-2xl text-sm text-white/80 md:text-base">
+                Encuentra rápidamente tus partidos, revisa el calendario y sigue resultados del campeonato.
+              </p>
+              <div className="mt-6 flex flex-wrap gap-3">
+                <Button asChild variant="secondary" className="bg-white text-primary hover:bg-white/90">
+                  <Link to="/campeonatos">Ver campeonatos</Link>
+                </Button>
+                <Button asChild variant="outline" className="border-white/30 bg-white/5 text-white hover:bg-white/10">
+                  <Link to="/mis-partidos">Buscar mis partidos</Link>
+                </Button>
+                <Button asChild variant="outline" className="border-white/30 bg-white/5 text-white hover:bg-white/10">
+                  <Link to="/kiosco">Modo kiosco</Link>
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card className="border-primary/10">
+          <CardHeader>
+            <CardTitle className="text-xl">Buscar mi colegio</CardTitle>
+            <CardDescription>Vista rápida por establecimiento.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild className="w-full">
+              <Link to="/mis-partidos">Ir a Mis partidos</Link>
+            </Button>
+          </CardContent>
+        </Card>
+        <Card className="border-primary/10">
+          <CardHeader>
+            <CardTitle className="text-xl">Ver fixture completo</CardTitle>
+            <CardDescription>Calendario, partidos y grupos.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild variant="outline" className="w-full">
+              <Link to={destacado ? `/campeonatos/${destacado.id}/calendario` : '/campeonatos'}>Abrir calendario</Link>
+            </Button>
+          </CardContent>
+        </Card>
+        <Card className="border-primary/10">
+          <CardHeader>
+            <CardTitle className="text-xl">Pantalla del gimnasio</CardTitle>
+            <CardDescription>Modo proyector para jornadas.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild variant="outline" className="w-full">
+              <Link to="/kiosco">Abrir kiosco</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+
+      {destacado ? (
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle>Campeonato destacado</CardTitle>
+              <CardDescription>Acceso rápido al fixture activo.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="font-display text-2xl font-semibold text-primary">{destacado.nombre}</p>
+                <p className="text-sm text-muted">
+                  Año {destacado.año} · {destacado.estado}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button asChild>
+                  <Link to={`/campeonatos/${destacado.id}`}>Ir al campeonato</Link>
+                </Button>
+                <Button asChild variant="outline">
+                  <Link to={`/campeonatos/${destacado.id}/calendario`}>Calendario</Link>
+                </Button>
+                <Button asChild variant="outline">
+                  <Link to={`/campeonatos/${destacado.id}/grupos`}>Grupos</Link>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+            <Card className="border-primary/10">
+              <CardHeader>
+                <CardTitle>Próximo partido</CardTitle>
+                <CardDescription>El siguiente encuentro programado del campeonato activo.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {partidosQ.isLoading ? (
+                  <Skeleton className="h-32 w-full" />
+                ) : siguiente ? (
+                  <div className="space-y-4">
+                    <div className="flex flex-wrap gap-2">
+                      <Badge>{siguiente.genero}</Badge>
+                      <Badge variant="secondary">{siguiente.grupo || siguiente.fase}</Badge>
+                      <Badge variant="muted">{siguiente.categoria}</Badge>
+                    </div>
+                    <div className="grid gap-3 md:grid-cols-[1fr_auto_1fr] md:items-center">
+                      <p className="font-display text-2xl font-semibold text-primary">{siguiente.localNombre}</p>
+                      <div className="text-center">
+                        <p className="font-display text-3xl font-bold text-secondary">VS</p>
+                        <p className="text-xs font-semibold text-muted">
+                          {formatPartidoDateKey(siguiente.fecha)} · {formatPartidoTime(siguiente.hora)}
+                        </p>
+                      </div>
+                      <p className="font-display text-2xl font-semibold text-primary md:text-right">
+                        {siguiente.visitaNombre}
+                      </p>
+                    </div>
+                    <p className="text-sm text-muted">{siguiente.lugar}</p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted">No hay próximos partidos programados.</p>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="border-primary/10">
+              <CardHeader>
+                <CardTitle>Partidos de hoy</CardTitle>
+                <CardDescription>{hoy.length} partidos para la fecha actual.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {partidosQ.isLoading ? (
+                  <Skeleton className="h-28 w-full" />
+                ) : hoy.length ? (
+                  hoy.slice(0, 3).map((p) => <MatchCard key={p.id} partido={p} />)
+                ) : (
+                  <p className="text-sm text-muted">No hay partidos programados para hoy.</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </>
+      ) : (
+        <Card>
+          <CardHeader>
+            <CardTitle>Sin datos todavía</CardTitle>
+            <CardDescription>El fixture público aparecerá cuando el administrador publique un campeonato.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild>
+              <Link to="/admin">Ir a administración</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  )
+}
