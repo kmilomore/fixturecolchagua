@@ -90,7 +90,7 @@ export function AdminPage() {
       <div className="space-y-6">
         <div>
           <h1 className="font-display text-3xl font-semibold text-primary">Administración</h1>
-          <p className="text-sm text-muted">Sesión activa validada con Google Sign-In y backend.</p>
+          <p className="text-sm text-muted">Sesión activa validada.</p>
         </div>
 
         <Card>
@@ -143,7 +143,7 @@ export function AdminPage() {
     <div className="mx-auto max-w-md space-y-6">
       <div>
         <h1 className="font-display text-3xl font-semibold text-primary">Admin</h1>
-        <p className="text-sm text-muted">Acceso exclusivo con Google. Solo entran correos autorizados por backend.</p>
+        <p className="text-sm text-muted">Acceso exclusivo con Google.</p>
       </div>
 
       <Card>
