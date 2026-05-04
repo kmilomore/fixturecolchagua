@@ -566,6 +566,34 @@ export function KioscoPage() {
       ? 'text-[4.5rem] xl:text-[5rem]'
       : 'text-7xl xl:text-8xl'
 
+  const upcomingCardPaddingClass = isUltraCompactFullscreen
+    ? 'p-2'
+    : isCompactFullscreen
+      ? 'p-2.5'
+      : isFullscreen
+        ? 'p-3'
+        : 'p-3'
+
+  const upcomingMetaClass = isUltraCompactFullscreen
+    ? 'text-[10px]'
+    : isCompactFullscreen
+      ? 'text-[11px]'
+      : 'text-sm'
+
+  const upcomingTitleClass = isUltraCompactFullscreen
+    ? 'text-[11px]'
+    : isCompactFullscreen
+      ? 'text-xs'
+      : 'text-sm'
+
+  const upcomingGridClass = isUltraCompactFullscreen
+    ? 'md:grid-cols-1 xl:grid-cols-1'
+    : isCompactFullscreen
+      ? 'md:grid-cols-1 xl:grid-cols-2'
+      : isFullscreen
+        ? 'md:grid-cols-2 xl:grid-cols-2'
+        : 'md:grid-cols-2 xl:grid-cols-4'
+
   const relativeUpdatedText = getRelativeUpdateText(partidosQ.data?.updatedAt, now)
 
   const toggleFullscreen = async () => {
@@ -926,21 +954,21 @@ export function KioscoPage() {
               <CardHeader>
                 <CardTitle className={`font-display text-primary ${isUltraCompactFullscreen ? 'text-2xl' : 'text-3xl'}`}>Próximos encuentros</CardTitle>
               </CardHeader>
-              <CardContent className={`grid gap-3 ${isUltraCompactFullscreen ? 'md:grid-cols-1 xl:grid-cols-1' : isFullscreen ? 'md:grid-cols-2 xl:grid-cols-2' : 'md:grid-cols-2 xl:grid-cols-4'}`}>
+              <CardContent className={`grid auto-rows-min gap-2.5 ${upcomingGridClass}`}>
                 {visibleUpcomingMatches.length ? (
                   visibleUpcomingMatches.map((p) => (
-                    <div key={p.id} className={`rounded-xl border border-primary/10 bg-white ${isUltraCompactFullscreen ? 'p-2.5' : 'p-3'} ${updatedMatchIds.includes(p.id) ? 'ring-2 ring-emerald-300/70' : ''}`}>
-                      <p className={`font-score font-bold text-secondary ${isUltraCompactFullscreen ? 'text-xs' : 'text-sm'}`}>
+                    <div key={p.id} className={`rounded-xl border border-primary/10 bg-white ${upcomingCardPaddingClass} ${updatedMatchIds.includes(p.id) ? 'ring-2 ring-emerald-300/70' : ''}`}>
+                      <p className={`font-score font-bold leading-tight text-secondary ${upcomingMetaClass}`}>
                         {formatPartidoDateKey(p.fecha)} · {formatPartidoTime(p.hora)}
                       </p>
-                      <div className="mt-2 flex flex-wrap gap-2">
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
                         <Badge className="px-2.5 py-1 text-[11px] uppercase tracking-wide">{p.disciplina}</Badge>
                         <Badge variant="muted">{p.categoria}</Badge>
                       </div>
-                      <p className={`mt-1 line-clamp-2 font-semibold text-primary ${isUltraCompactFullscreen ? 'text-xs' : 'text-sm'}`}>
+                      <p className={`mt-1 line-clamp-2 font-semibold leading-tight text-primary ${upcomingTitleClass}`}>
                         {p.localNombre} vs {p.visitaNombre}
                       </p>
-                      <p className="mt-1 text-xs text-muted">{p.lugar}</p>
+                      <p className="mt-1 line-clamp-1 text-[11px] leading-tight text-muted">{p.lugar}</p>
                     </div>
                   ))
                 ) : (
