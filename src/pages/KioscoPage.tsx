@@ -17,6 +17,7 @@ import { sortMatches } from '@/utils/matches'
 const ROTATING_PANELS = ['timeline', 'recent', 'history', 'alerts'] as const
 const KIOSK_SETTINGS_STORAGE_KEY = 'slep_kiosk_settings_v1'
 const SAN_FERNANDO_WEATHER_URL = '/api/weather'
+const WEATHER_REQUEST_TIMEOUT_MS = 8000
 
 type RotatingPanel = (typeof ROTATING_PANELS)[number]
 
@@ -48,6 +49,43 @@ interface WeatherSummary {
   max: number
   min: number
   rain: number
+}
+
+async function fetchWeather(): Promise<OpenMeteoResponse> {
+  const controller = new AbortController()
+  const timeoutId = window.setTimeout(() => controller.abort(), WEATHER_REQUEST_TIMEOUT_MS)
+
+  try {
+    const response = await fetch(SAN_FERNANDO_WEATHER_URL, {
+      signal: controller.signal,
+      headers: {
+        Accept: 'application/json',
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error(`No se pudo consultar la meteorología de San Fernando (${response.status}).`)
+    }
+
+    const contentType = response.headers.get('content-type') || ''
+    if (!contentType.includes('application/json')) {
+      throw new Error('La ruta del clima no devolvió JSON válido.')
+    }
+
+    return (await response.json()) as OpenMeteoResponse
+  } catch (error) {
+    const normalizedError =
+      error instanceof DOMException && error.name === 'AbortError'
+        ? new Error('La consulta meteorológica excedió el tiempo de espera.')
+        : error instanceof Error
+          ? error
+          : new Error('No se pudo consultar la meteorología de San Fernando.')
+
+    console.warn('[kiosco] Weather request failed', normalizedError)
+    throw normalizedError
+  } finally {
+    window.clearTimeout(timeoutId)
+  }
 }
 
 function getDefaultKioskSettings(): KioskSettings {
@@ -304,13 +342,10 @@ export function KioscoPage() {
 
   const weatherQ = useQuery({
     queryKey: ['weather', 'san-fernando-cl'],
-    queryFn: async () => {
-      const response = await fetch(SAN_FERNANDO_WEATHER_URL)
-      if (!response.ok) throw new Error('No se pudo consultar la meteorología de San Fernando.')
-      return (await response.json()) as OpenMeteoResponse
-    },
+    queryFn: fetchWeather,
     staleTime: 10 * 60 * 1000,
     refetchInterval: 15 * 60 * 1000,
+    retry: false,
   })
 
   const { siguiente, proximos } = useMemo(() => {
