@@ -5,10 +5,10 @@ import { hasGasUrl } from '@/config'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useAdminSession } from '@/stores/adminSession'
+import { isAdminSessionActive, useAdminSession } from '@/stores/adminSession'
 
 export function CampeonatosPage() {
-  const isAdmin = useAdminSession((s) => s.ok)
+  const isAdmin = useAdminSession((s) => isAdminSessionActive(s))
   const q = useQuery({
     queryKey: ['campeonatos'],
     queryFn: () => api.campeonatos.getAll(),

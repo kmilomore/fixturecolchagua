@@ -54,6 +54,14 @@ export interface Partido {
   jornada: number | string
 }
 
+export interface PartidoResumen {
+  siguiente: Partido | null
+  hoy: Partido[]
+  proximos: Partido[]
+  totalHoy: number
+  updatedAt: string
+}
+
 export interface Grupo {
   id: string
   campeonatoId: string

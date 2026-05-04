@@ -141,6 +141,13 @@ function verifyGoogleIdToken_(idToken, clientId) {
   return tokenInfo;
 }
 
+function authorizeExternalRequest() {
+  const response = UrlFetchApp.fetch('https://oauth2.googleapis.com/tokeninfo?id_token=test', {
+    muteHttpExceptions: true
+  });
+  Logger.log(response.getResponseCode());
+}
+
 function hashToken_(token) {
   const digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, token);
   return Utilities.base64EncodeWebSafe(digest);

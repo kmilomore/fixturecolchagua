@@ -14,10 +14,10 @@ import { FasesPage } from '@/pages/campeonato/FasesPage'
 import { PartidosPage } from '@/pages/campeonato/PartidosPage'
 import { AdminPage } from '@/pages/admin/AdminPage'
 import { AdminResultadosPage } from '@/pages/admin/AdminResultadosPage'
-import { useAdminSession } from '@/stores/adminSession'
+import { isAdminSessionActive, useAdminSession } from '@/stores/adminSession'
 
 function RequireAdmin({ children }: { children: ReactNode }) {
-  const ok = useAdminSession((s) => s.ok)
+  const ok = useAdminSession((s) => isAdminSessionActive(s))
   if (!ok) return <Navigate to="/admin" replace />
   return children
 }

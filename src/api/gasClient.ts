@@ -5,6 +5,7 @@ import type {
   FilaTabla,
   Grupo,
   Partido,
+  PartidoResumen,
 } from '@/types'
 import { ADMIN_SESSION_STORAGE_KEY } from '@/stores/adminSession'
 
@@ -32,7 +33,9 @@ function getStoredAdminToken() {
   if (!raw) return ''
 
   try {
-    const parsed = JSON.parse(raw) as { state?: { token?: string } }
+    const parsed = JSON.parse(raw) as { state?: { token?: string; expiresAt?: number } }
+    const expiresAt = Number(parsed.state?.expiresAt || 0)
+    if (!expiresAt || expiresAt <= Date.now()) return ''
     return parsed.state?.token || ''
   } catch {
     return ''
@@ -111,9 +114,24 @@ export const api = {
       fase: string
       fecha: string
       jornada: string
+      vista: string
     }>) =>
       get<Partido[]>({
         resource: 'partidos',
+        ...Object.fromEntries(
+          Object.entries(filters).map(([k, v]) => [k, v === undefined ? '' : String(v)]),
+        ),
+      }),
+    getResumen: (filters: Partial<{
+      campeonatoId: string
+      disciplinaId: string
+      disciplina: string
+      genero: string
+      fase: string
+    }>) =>
+      get<PartidoResumen>({
+        resource: 'partidos',
+        vista: 'resumen',
         ...Object.fromEntries(
           Object.entries(filters).map(([k, v]) => [k, v === undefined ? '' : String(v)]),
         ),

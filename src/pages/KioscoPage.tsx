@@ -7,9 +7,8 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatPartidoDateKey, formatPartidoTime } from '@/utils/formatDate'
-import { getTodayMatches, getUpcomingMatch, sortMatches } from '@/utils/matches'
 
-export function KioscoPage() {
+function KioscoClock() {
   const [clock, setClock] = useState(new Date())
 
   useEffect(() => {
@@ -17,6 +16,15 @@ export function KioscoPage() {
     return () => window.clearInterval(id)
   }, [])
 
+  return (
+    <div className="text-left md:text-right">
+      <p className="font-score text-4xl font-bold tabular-nums">{formatPartidoTime(clock.toISOString())}</p>
+      <p className="text-sm text-white/70">Actualiza cada 60 segundos</p>
+    </div>
+  )
+}
+
+export function KioscoPage() {
   const campeonatosQ = useQuery({
     queryKey: ['campeonatos'],
     queryFn: () => api.campeonatos.getAll(),
@@ -30,22 +38,18 @@ export function KioscoPage() {
   }, [campeonatosQ.data])
 
   const partidosQ = useQuery({
-    queryKey: ['partidos', campeonato?.id, 'kiosco'],
-    queryFn: () => api.partidos.query({ campeonatoId: campeonato!.id }),
+    queryKey: ['partidos', campeonato?.id, 'resumen-kiosco'],
+    queryFn: () => api.partidos.getResumen({ campeonatoId: campeonato!.id }),
     enabled: hasGasUrl && Boolean(campeonato?.id),
     staleTime: 60 * 1000,
     refetchInterval: 60 * 1000,
   })
 
   const { siguiente, hoy, proximos } = useMemo(() => {
-    const rows = partidosQ.data || []
     return {
-      siguiente: getUpcomingMatch(rows),
-      hoy: getTodayMatches(rows),
-      proximos: [...rows]
-        .filter((p) => p.estado !== 'finalizado' && p.estado !== 'postergado')
-        .sort(sortMatches)
-        .slice(0, 8),
+      siguiente: partidosQ.data?.siguiente || null,
+      hoy: partidosQ.data?.hoy || [],
+      proximos: partidosQ.data?.proximos || [],
     }
   }, [partidosQ.data])
 
@@ -65,10 +69,7 @@ export function KioscoPage() {
               <p className="text-white/75">{campeonato?.nombre || 'Campeonato Deportivo SLEP Colchagua'}</p>
             </div>
           </div>
-          <div className="text-left md:text-right">
-            <p className="font-score text-4xl font-bold tabular-nums">{formatPartidoTime(clock.toISOString())}</p>
-            <p className="text-sm text-white/70">Actualiza cada 60 segundos</p>
-          </div>
+          <KioscoClock />
         </header>
 
         {campeonatosQ.isLoading || partidosQ.isLoading ? (

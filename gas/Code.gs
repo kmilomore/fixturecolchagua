@@ -5,7 +5,7 @@
  * GET  ?resource=campeonatos
  * GET  ?resource=campeonatos&id=
  * GET  ?resource=disciplinas&campeonatoId=
- * GET  ?resource=partidos&campeonatoId=&disciplinaId=&disciplina=&genero=&fase=&fecha=&jornada=
+ * GET  ?resource=partidos&campeonatoId=&disciplinaId=&disciplina=&genero=&fase=&fecha=&jornada=&vista=
  * GET  ?resource=grupos&campeonatoId=&disciplinaId=&genero=
  * GET  ?resource=tabla&grupoId=
  * GET  ?resource=equipos&campeonatoId=
@@ -35,7 +35,8 @@ function doGet(e) {
           genero: params.genero,
           fase: params.fase,
           fecha: params.fecha,
-          jornada: params.jornada
+          jornada: params.jornada,
+          vista: params.vista
         });
 
       case 'grupos':

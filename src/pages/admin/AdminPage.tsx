@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import { api } from '@/api/gasClient'
-import { useAdminSession } from '@/stores/adminSession'
+import { isAdminSessionActive, useAdminSession } from '@/stores/adminSession'
 import { googleClientId, hasGoogleClientId } from '@/config'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -33,7 +33,8 @@ function loadGoogleIdentityScript() {
 }
 
 export function AdminPage() {
-  const { ok, clearSession, setSession, user } = useAdminSession()
+  const { clearSession, setSession, user } = useAdminSession()
+  const ok = useAdminSession((s) => isAdminSessionActive(s))
   const buttonRef = useRef<HTMLDivElement | null>(null)
 
   const login = useMutation({

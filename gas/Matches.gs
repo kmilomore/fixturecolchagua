@@ -5,53 +5,13 @@
 
 var Matches = {
   query: function (filters) {
-    let partidos = sheetToObjects('partidos');
-    const equipos = sheetToObjects('equipos');
+    let partidos = hydrateMatches_();
+    partidos = filterMatches_(partidos, filters);
+    partidos.sort(comparePartidos_);
 
-    partidos = partidos.map(function (p) {
-      const local = equipos.find(function (e) { return e.id === p.localId; });
-      const visita = equipos.find(function (e) { return e.id === p.visitaId; });
-      return Object.assign({}, p, {
-        fecha: normalizeFechaForApi_(p.fecha),
-        hora: normalizeHoraForApi_(p.hora),
-        localNombre: local ? local.nombre : p.localId,
-        visitaNombre: visita ? visita.nombre : p.visitaId
-      });
-    });
-
-    if (filters.campeonatoId) {
-      partidos = partidos.filter(function (p) { return p.campeonatoId === filters.campeonatoId; });
+    if (String(filters.vista || '').toLowerCase() === 'resumen') {
+      return jsonResponse(buildMatchesSummary_(partidos));
     }
-    if (filters.disciplinaId) {
-      partidos = partidos.filter(function (p) { return p.disciplinaId === filters.disciplinaId; });
-    }
-    if (filters.disciplina) {
-      partidos = partidos.filter(function (p) {
-        return String(p.disciplina).toLowerCase() === String(filters.disciplina).toLowerCase();
-      });
-    }
-    if (filters.genero) {
-      partidos = partidos.filter(function (p) {
-        return String(p.genero || '').toLowerCase() === String(filters.genero || '').toLowerCase();
-      });
-    }
-    if (filters.fase) {
-      partidos = partidos.filter(function (p) { return p.fase === filters.fase; });
-    }
-    if (filters.fecha) {
-      partidos = partidos.filter(function (p) { return normalizeFechaForApi_(p.fecha) === normalizeFechaForApi_(filters.fecha); });
-    }
-    if (filters.jornada !== undefined && filters.jornada !== '') {
-      partidos = partidos.filter(function (p) {
-        return String(p.jornada) === String(filters.jornada);
-      });
-    }
-
-    partidos.sort(function (a, b) {
-      const da = String(a.fecha) + ' ' + String(a.hora);
-      const db = String(b.fecha) + ' ' + String(b.hora);
-      return da.localeCompare(db);
-    });
 
     return jsonResponse(partidos);
   },
@@ -84,6 +44,122 @@ var Matches = {
     }
   }
 };
+
+function hydrateMatches_() {
+  const partidos = sheetToObjects('partidos');
+  const equipos = sheetToObjects('equipos');
+
+  return partidos.map(function (p) {
+    const local = equipos.find(function (e) { return e.id === p.localId; });
+    const visita = equipos.find(function (e) { return e.id === p.visitaId; });
+    return Object.assign({}, p, {
+      fecha: normalizeFechaForApi_(p.fecha),
+      hora: normalizeHoraForApi_(p.hora),
+      disciplina: sanitizeMatchText_(p.disciplina),
+      lugar: sanitizeMatchText_(p.lugar),
+      fase: sanitizeMatchText_(p.fase),
+      categoria: sanitizeMatchText_(p.categoria),
+      grupo: sanitizeMatchText_(p.grupo),
+      estado: sanitizeMatchText_(p.estado),
+      localNombre: sanitizeMatchText_(local ? local.nombre : p.localId),
+      visitaNombre: sanitizeMatchText_(visita ? visita.nombre : p.visitaId)
+    });
+  });
+}
+
+function filterMatches_(partidos, filters) {
+  let rows = partidos;
+
+  if (filters.campeonatoId) {
+    rows = rows.filter(function (p) { return p.campeonatoId === filters.campeonatoId; });
+  }
+  if (filters.disciplinaId) {
+    rows = rows.filter(function (p) { return p.disciplinaId === filters.disciplinaId; });
+  }
+  if (filters.disciplina) {
+    rows = rows.filter(function (p) {
+      return String(p.disciplina).toLowerCase() === String(filters.disciplina).toLowerCase();
+    });
+  }
+  if (filters.genero) {
+    rows = rows.filter(function (p) {
+      return String(p.genero || '').toLowerCase() === String(filters.genero || '').toLowerCase();
+    });
+  }
+  if (filters.fase) {
+    rows = rows.filter(function (p) { return p.fase === filters.fase; });
+  }
+  if (filters.fecha) {
+    rows = rows.filter(function (p) { return normalizeFechaForApi_(p.fecha) === normalizeFechaForApi_(filters.fecha); });
+  }
+  if (filters.jornada !== undefined && filters.jornada !== '') {
+    rows = rows.filter(function (p) {
+      return String(p.jornada) === String(filters.jornada);
+    });
+  }
+
+  return rows;
+}
+
+function comparePartidos_(a, b) {
+  const da = String(a.fecha) + ' ' + String(a.hora);
+  const db = String(b.fecha) + ' ' + String(b.hora);
+  return da.localeCompare(db);
+}
+
+function buildMatchesSummary_(partidos) {
+  const now = new Date();
+  const todayKey = Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  const activos = partidos.filter(function (p) {
+    return p.estado !== 'finalizado' && p.estado !== 'postergado';
+  });
+  const hoy = partidos.filter(function (p) {
+    return String(p.fecha) === todayKey;
+  }).slice(0, 6);
+  const proximos = activos.slice(0, 8);
+  let siguiente = null;
+
+  for (let i = 0; i < activos.length; i += 1) {
+    const partido = activos[i];
+    const date = parsePartidoDateTime_(partido.fecha, partido.hora);
+    if (!date) continue;
+    if (date.getTime() >= now.getTime()) {
+      siguiente = partido;
+      break;
+    }
+  }
+
+  return {
+    siguiente: siguiente,
+    hoy: hoy,
+    proximos: proximos,
+    totalHoy: hoy.length,
+    updatedAt: now.toISOString()
+  };
+}
+
+function parsePartidoDateTime_(fecha, hora) {
+  const normalizedFecha = normalizeFechaForApi_(fecha);
+  const normalizedHora = normalizeHoraForApi_(hora) || '00:00';
+  if (!normalizedFecha) return null;
+
+  const parts = normalizedHora.split(':');
+  const hour = Number(parts[0] || 0);
+  const minute = Number(parts[1] || 0);
+  const date = new Date(normalizedFecha + 'T00:00:00');
+
+  if (isNaN(date.getTime())) return null;
+
+  date.setHours(hour, minute, 0, 0);
+  return date;
+}
+
+function sanitizeMatchText_(value) {
+  return String(value || '')
+    .replace(/[\u0000-\u001F\u007F]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
 function normalizeFechaForApi_(value) {
   if (!value) return '';

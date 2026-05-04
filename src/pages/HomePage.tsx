@@ -8,7 +8,6 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { MatchCard } from '@/components/MatchCard'
 import { formatPartidoDateKey, formatPartidoTime } from '@/utils/formatDate'
-import { getTodayMatches, getUpcomingMatch } from '@/utils/matches'
 
 export function HomePage() {
   const q = useQuery({
@@ -21,8 +20,8 @@ export function HomePage() {
   const destacado = activos[0] || q.data?.[0]
 
   const partidosQ = useQuery({
-    queryKey: ['partidos', destacado?.id, 'home'],
-    queryFn: () => api.partidos.query({ campeonatoId: destacado!.id }),
+    queryKey: ['partidos', destacado?.id, 'resumen-home'],
+    queryFn: () => api.partidos.getResumen({ campeonatoId: destacado!.id }),
     enabled: hasGasUrl && Boolean(destacado?.id),
     staleTime: 5 * 60 * 1000,
   })
@@ -66,8 +65,8 @@ export function HomePage() {
     )
   }
 
-  const siguiente = getUpcomingMatch(partidosQ.data || [])
-  const hoy = getTodayMatches(partidosQ.data || [])
+  const siguiente = partidosQ.data?.siguiente || null
+  const hoy = partidosQ.data?.hoy || []
 
   return (
     <div className="space-y-8">
@@ -201,7 +200,7 @@ export function HomePage() {
             <Card className="border-primary/10">
               <CardHeader>
                 <CardTitle>Partidos de hoy</CardTitle>
-                <CardDescription>{hoy.length} partidos para la fecha actual.</CardDescription>
+                <CardDescription>{partidosQ.data?.totalHoy || 0} partidos para la fecha actual.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 {partidosQ.isLoading ? (

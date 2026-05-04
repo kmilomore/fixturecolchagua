@@ -1,13 +1,10 @@
+import { useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { NavLink, Outlet } from 'react-router-dom'
 import { CalendarDays, Home, LayoutDashboard, Search, Shield, Trophy } from 'lucide-react'
+import { api } from '@/api/gasClient'
+import { hasGasUrl } from '@/config'
 import { cn } from '@/lib/utils'
-
-const nav = [
-  { to: '/', label: 'Inicio', icon: Home, end: true },
-  { to: '/campeonatos', label: 'Campeonatos', icon: Trophy, end: false },
-  { to: '/mis-partidos', label: 'Mis partidos', icon: Search, end: true },
-  { to: '/admin', label: 'Admin', icon: Shield, end: true },
-]
 
 function linkClass({ isActive }: { isActive: boolean }) {
   return cn(
@@ -18,6 +15,24 @@ function linkClass({ isActive }: { isActive: boolean }) {
 
 export function AppShell() {
   const appName = import.meta.env.VITE_APP_NAME || 'SLEP Colchagua'
+  const campeonatosQ = useQuery({
+    queryKey: ['campeonatos'],
+    queryFn: () => api.campeonatos.getAll(),
+    enabled: hasGasUrl,
+    staleTime: 5 * 60 * 1000,
+  })
+  const campeonatoActivo = useMemo(() => {
+    const rows = campeonatosQ.data || []
+    return rows.find((row) => row.estado === 'activo') || rows[0] || null
+  }, [campeonatosQ.data])
+  const fixturePath = campeonatoActivo ? `/campeonatos/${campeonatoActivo.id}/calendario` : '/campeonatos'
+  const nav = [
+    { to: '/', label: 'Inicio', icon: Home, end: true },
+    { to: '/campeonatos', label: 'Campeonatos', icon: Trophy, end: false },
+    { to: fixturePath, label: 'Fixture activo', mobileLabel: 'Fixture', icon: CalendarDays, end: false },
+    { to: '/mis-partidos', label: 'Mis partidos', icon: Search, end: true },
+    { to: '/admin', label: 'Admin', icon: Shield, end: true },
+  ]
 
   return (
     <div className="flex min-h-dvh flex-col pb-20 md:pb-0">
@@ -50,26 +65,22 @@ export function AppShell() {
 
       <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-black/10 bg-white/95 backdrop-blur md:hidden">
         <div className="mx-auto flex max-w-lg items-stretch justify-around px-2 py-2">
-          <NavLink to="/" end className={({ isActive }) => cn('flex flex-1 flex-col items-center gap-1 py-2 text-xs', isActive ? 'text-primary' : 'text-muted')}>
-            <Home className="h-5 w-5" />
-            Inicio
-          </NavLink>
-          <NavLink to="/campeonatos" className={({ isActive }) => cn('flex flex-1 flex-col items-center gap-1 py-2 text-xs', isActive ? 'text-primary' : 'text-muted')}>
-            <Trophy className="h-5 w-5" />
-            Campeonatos
-          </NavLink>
-          <NavLink to="/mis-partidos" className={({ isActive }) => cn('flex flex-1 flex-col items-center gap-1 py-2 text-xs', isActive ? 'text-primary' : 'text-muted')}>
-            <Search className="h-5 w-5" />
-            Mis partidos
-          </NavLink>
-          <NavLink to="/campeonatos" className={({ isActive }) => cn('flex flex-1 flex-col items-center gap-1 py-2 text-xs', isActive ? 'text-primary' : 'text-muted')}>
-            <CalendarDays className="h-5 w-5" />
-            Fixture
-          </NavLink>
-          <NavLink to="/admin" className={({ isActive }) => cn('flex flex-1 flex-col items-center gap-1 py-2 text-xs', isActive ? 'text-primary' : 'text-muted')}>
-            <LayoutDashboard className="h-5 w-5" />
-            Admin
-          </NavLink>
+          {nav.map((item) => {
+            const Icon = item.to === '/admin' ? LayoutDashboard : item.icon
+            return (
+              <NavLink
+                key={item.to + '-mobile'}
+                to={item.to}
+                end={item.end}
+                className={({ isActive }) =>
+                  cn('flex flex-1 flex-col items-center gap-1 py-2 text-xs', isActive ? 'text-primary' : 'text-muted')
+                }
+              >
+                <Icon className="h-5 w-5" />
+                {item.mobileLabel || item.label}
+              </NavLink>
+            )
+          })}
         </div>
       </nav>
     </div>

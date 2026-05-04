@@ -98,6 +98,15 @@ VITE_GOOGLE_CLIENT_ID=<google_oauth_client_id>
 
 La autenticación admin debe usar Google Sign-In. El frontend necesita `VITE_GOOGLE_CLIENT_ID` y el backend debe validar el `id_token` contra `GOOGLE_CLIENT_ID`. La autorización admin debe resolverse cruzando el correo en una hoja `admin_whitelist` dentro del mismo Spreadsheet.
 
+Diferencia operativa importante:
+
+- `VITE_GOOGLE_CLIENT_ID` y `VITE_GAS_URL` viven en Vercel y solo afectan al frontend.
+- `GOOGLE_CLIENT_ID` y `SPREADSHEET_ID` viven en Script Properties del proyecto de Google Apps Script.
+- Cambiar variables en Vercel no configura automáticamente Script Properties.
+- El `GOOGLE_CLIENT_ID` del backend debe ser exactamente el mismo OAuth Client ID del frontend y tener formato `*.apps.googleusercontent.com`.
+
+El cliente POST del frontend hacia Apps Script no debe forzar `Content-Type: application/json`. Para evitar preflight CORS contra la Web App de Apps Script, el request se envía con `body: JSON.stringify(...)` y sin header explícito de content type.
+
 ## Google Sheets
 
 El Spreadsheet usado por GAS se configura en `Utils.gs` mediante `SPREADSHEET_ID` o Script Properties.
@@ -234,7 +243,31 @@ Script Properties requeridas en Google Apps Script:
 
 ```txt
 GOOGLE_CLIENT_ID=<google_oauth_client_id>
+SPREADSHEET_ID=<google_spreadsheet_id>
 ```
+
+Archivo de manifiesto requerido en Apps Script:
+
+```json
+{
+  "timeZone": "America/Santiago",
+  "exceptionLogging": "STACKDRIVER",
+  "runtimeVersion": "V8",
+  "oauthScopes": [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/script.external_request"
+  ]
+}
+```
+
+Notas de operación para Apps Script:
+
+- El manifiesto va en `appsscript.json`, no dentro de `Code.gs`, `Utils.gs` ni `CSVImport.gs`.
+- Después de agregar `script.external_request`, hay que ejecutar una función manualmente desde el editor para reautorizar `UrlFetchApp.fetch`.
+- Un helper temporal útil para disparar esa autorización es `authorizeExternalRequest()` en `Utils.gs`.
+- Si `authorizeExternalRequest()` devuelve `400`, eso confirma que `UrlFetchApp.fetch` ya quedó autorizado. El `400` es esperado porque usa un `id_token` falso de prueba.
+- Después de cambiar Script Properties, manifiesto o código GAS, hay que redeployar la Web App como nueva versión para que `/exec` use esos cambios.
+- El deployment de la Web App debe ejecutarse como `Me`.
 
 Hoja requerida para lista blanca admin:
 
@@ -357,6 +390,12 @@ Debe usar scroll horizontal en pantallas pequeñas, no apilar botones verticalme
 - El home muestra un bloque de próximo partido y partidos de hoy usando el campeonato activo.
 - La vista `Mis partidos` filtra por coincidencia parcial en `localNombre` y `visitaNombre`.
 - El modo kiosco consulta partidos cada 60 segundos mediante TanStack Query (`refetchInterval`).
+- La integración con Google Sign-In requiere permitir `https://accounts.google.com` en CSP para scripts y estilos. En Vercel se usa además `style-src-elem` para evitar el bloqueo del stylesheet de GSI.
+- El frontend publica `Cross-Origin-Opener-Policy: same-origin-allow-popups` para convivir mejor con el flujo popup de Google Identity Services.
+- El warning `Cross-Origin-Opener-Policy policy would block the window.postMessage call` puede seguir apareciendo en consola incluso cuando el login funciona. Si la credencial vuelve y el acceso admin entra, se considera ruido no bloqueante.
+- Si Apps Script responde `GOOGLE_CLIENT_ID no configurado en Script Properties`, el problema está en Script Properties del proyecto GAS, no en variables de entorno de Vercel.
+- Si Apps Script responde `No cuentas con el permiso para llamar a UrlFetchApp.fetch`, el problema es de manifiesto o autorización del proyecto GAS, no del frontend.
+- Si un cambio en Apps Script parece no surtir efecto, validar que `VITE_GAS_URL` apunte al mismo deployment `/exec` que se acaba de redeployar. Un error persistente con código local correcto suele significar que el frontend está llamando a una versión vieja o a otro proyecto.
 
 ## Cosas que Deben Evitarse
 

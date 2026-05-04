@@ -63,7 +63,11 @@ export function MisPartidosPage() {
       <Card>
         <CardHeader>
           <CardTitle>Buscar establecimiento</CardTitle>
-          <CardDescription>Ejemplo: British, Marista, Angostura, Washington.</CardDescription>
+          <CardDescription>
+            {campeonato
+              ? `Buscas sobre ${campeonato.nombre}. Ejemplo: British, Marista, Angostura, Washington.`
+              : 'Ejemplo: British, Marista, Angostura, Washington.'}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="relative">
@@ -82,22 +86,72 @@ export function MisPartidosPage() {
         <div className="space-y-3">
           <Skeleton className="h-28 w-full" />
           <Skeleton className="h-28 w-full" />
+          <Skeleton className="h-28 w-full" />
         </div>
       ) : partidosQ.isError ? (
-        <p className="text-accent">{(partidosQ.error as Error).message}</p>
+        <Card>
+          <CardHeader>
+            <CardTitle>No se pudo cargar la búsqueda</CardTitle>
+            <CardDescription>{(partidosQ.error as Error).message}</CardDescription>
+          </CardHeader>
+        </Card>
+      ) : !campeonato ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Todavía no hay fixture publicado</CardTitle>
+            <CardDescription>Cuando exista un campeonato activo, aquí podrás filtrar por establecimiento.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild variant="outline">
+              <Link to="/campeonatos">Ver campeonatos</Link>
+            </Button>
+          </CardContent>
+        </Card>
       ) : search.trim() ? (
-        <div className="space-y-3">
-          <p className="text-sm text-muted">
-            {resultados.length} partidos encontrados para “{search.trim()}”.
-          </p>
-          <div className="stagger-children space-y-3">
-            {resultados.map((p) => (
-              <MatchCard key={p.id} partido={p} />
-            ))}
+        resultados.length ? (
+          <div className="space-y-3">
+            <p className="text-sm text-muted">
+              {resultados.length} partidos encontrados para “{search.trim()}”.
+            </p>
+            <div className="stagger-children space-y-3">
+              {resultados.map((p) => (
+                <MatchCard key={p.id} partido={p} />
+              ))}
+            </div>
           </div>
-        </div>
+        ) : (
+          <Card>
+            <CardHeader>
+              <CardTitle>Sin coincidencias</CardTitle>
+              <CardDescription>
+                No encontramos partidos para “{search.trim()}” en {campeonato.nombre}. Prueba con una parte del nombre del establecimiento.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" onClick={() => setSearch('')}>
+                Limpiar búsqueda
+              </Button>
+              <Button asChild>
+                <Link to={`/campeonatos/${campeonato.id}/calendario`}>Ver calendario completo</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        )
       ) : (
-        <p className="text-sm text-muted">Ingresa un nombre para comenzar la búsqueda.</p>
+        <Card>
+          <CardHeader>
+            <CardTitle>Empieza por tu establecimiento</CardTitle>
+            <CardDescription>Escribe una parte del nombre y te mostraremos solo sus partidos y resultados.</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-2">
+            <Button type="button" variant="outline" onClick={() => setSearch('Liceo')}>
+              Probar con “Liceo”
+            </Button>
+            <Button asChild>
+              <Link to={`/campeonatos/${campeonato.id}/calendario`}>Ir al calendario</Link>
+            </Button>
+          </CardContent>
+        </Card>
       )}
     </div>
   )
