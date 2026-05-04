@@ -65,7 +65,6 @@ async function post<T>(body: {
   const res = await fetch(GAS_URL as string, {
     method: 'POST',
     body: JSON.stringify({ ...body, token }),
-    headers: { 'Content-Type': 'application/json' },
   })
   const json = (await res.json()) as GASResponse<T> & { data: unknown }
   if (json.status >= 400) {
