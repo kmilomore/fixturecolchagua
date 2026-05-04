@@ -42,13 +42,21 @@ function getStoredAdminToken() {
   }
 }
 
+const API_TIMEOUT_MS = 15_000
+
+function fetchWithTimeout(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  const controller = new AbortController()
+  const id = setTimeout(() => controller.abort(), API_TIMEOUT_MS)
+  return fetch(input, { ...init, signal: controller.signal }).finally(() => clearTimeout(id))
+}
+
 async function get<T>(params: Record<string, string | undefined>): Promise<T> {
   assertGasUrl()
   const url = new URL(GAS_URL as string)
   Object.entries(params).forEach(([k, v]) => {
     if (v !== undefined && v !== '') url.searchParams.append(k, v)
   })
-  const res = await fetch(url.toString())
+  const res = await fetchWithTimeout(url.toString())
   const json = (await res.json()) as GASResponse<T> & { data: unknown }
   if (json.status >= 400) {
     const err = json.data as { error?: string }
@@ -65,7 +73,7 @@ async function post<T>(body: {
 }): Promise<T> {
   assertGasUrl()
   const token = body.token ?? getStoredAdminToken()
-  const res = await fetch(GAS_URL as string, {
+  const res = await fetchWithTimeout(GAS_URL as string, {
     method: 'POST',
     body: JSON.stringify({ ...body, token }),
   })
