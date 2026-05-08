@@ -7,10 +7,11 @@ import { useCampeonatoOutlet } from '@/pages/campeonato/outletContext'
 import { CalendarView } from '@/components/CalendarView'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { Partido } from '@/types'
+import { buildMatchDetailSearch } from '@/utils/matchLinks'
 
 export function CalendarioPage() {
   const { campeonatoId, disciplinaId } = useCampeonatoOutlet()
-  const [params] = useSearchParams()
+  const [params, setParams] = useSearchParams()
   const genero = params.get('genero') || 'Damas'
   const categoria = params.get('categoria') || ''
   const fase = params.get('fase') || 'grupos'
@@ -46,5 +47,13 @@ export function CalendarioPage() {
 
   if (q.isError) return <p className="text-accent">{(q.error as Error).message}</p>
 
-  return <CalendarView partidos={filtrados as Partido[]} />
+  return (
+    <CalendarView
+      partidos={filtrados as Partido[]}
+      onSelectMatch={(partido) => {
+        const next = buildMatchDetailSearch(params.toString(), partido)
+        setParams(new URLSearchParams(next), { replace: true })
+      }}
+    />
+  )
 }

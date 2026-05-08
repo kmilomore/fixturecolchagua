@@ -3,6 +3,8 @@ import { useQuery } from '@tanstack/react-query'
 import { NavLink, Outlet } from 'react-router-dom'
 import { CalendarDays, Home, LayoutDashboard, Search, Shield, Trophy } from 'lucide-react'
 import { api } from '@/api/gasClient'
+import { GlobalHeaderSearch } from '@/components/GlobalHeaderSearch'
+import { GlobalMatchDetailController } from '@/components/GlobalMatchDetailController'
 import { hasGasUrl } from '@/config'
 import { cn } from '@/lib/utils'
 
@@ -48,6 +50,10 @@ export function AppShell() {
             </div>
           </NavLink>
 
+          <div className="hidden flex-1 justify-center px-4 md:flex">
+            <GlobalHeaderSearch campeonatoId={campeonatoActivo?.id} />
+          </div>
+
           <nav className="hidden items-center gap-2 md:flex">
             {nav.map((item) => (
               <NavLink key={item.label} to={item.to} end={item.end} className={linkClass}>
@@ -56,6 +62,10 @@ export function AppShell() {
               </NavLink>
             ))}
           </nav>
+
+          <div className="md:hidden">
+            <GlobalHeaderSearch campeonatoId={campeonatoActivo?.id} />
+          </div>
         </div>
       </header>
 
@@ -87,6 +97,8 @@ export function AppShell() {
           })}
         </div>
       </nav>
+
+      <GlobalMatchDetailController />
     </div>
   )
 }

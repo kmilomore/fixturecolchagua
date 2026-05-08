@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { MatchCard } from '@/components/MatchCard'
+import { buildCanonicalMatchHref } from '@/utils/matchLinks'
 import { formatPartidoDateKey, formatPartidoTime } from '@/utils/formatDate'
 
 export function HomePage() {
@@ -89,6 +90,11 @@ export function HomePage() {
                 Encuentra rápidamente tus partidos, revisa el calendario y sigue resultados del campeonato.
               </p>
               <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                {siguiente ? (
+                  <Button asChild className="w-full sm:w-auto">
+                    <Link to={buildCanonicalMatchHref(siguiente)}>Ver próximo partido</Link>
+                  </Button>
+                ) : null}
                 <Button asChild variant="secondary" className="w-full bg-white text-primary hover:bg-white/90 sm:w-auto">
                   <Link to="/campeonatos">Ver campeonatos</Link>
                 </Button>
@@ -209,6 +215,16 @@ export function HomePage() {
                       </p>
                     </div>
                     <p className="text-sm text-muted">{siguiente.lugar}</p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button asChild size="sm">
+                        <Link to={buildCanonicalMatchHref(siguiente)}>Abrir detalle</Link>
+                      </Button>
+                      <Button asChild size="sm" variant="outline">
+                        <Link to={`/campeonatos/${destacado.id}/partidos?campeonatoId=${encodeURIComponent(destacado.id)}&partidoId=${encodeURIComponent(siguiente.id)}`}>
+                          Ir a jornada
+                        </Link>
+                      </Button>
+                    </div>
                   </div>
                 ) : (
                   <p className="text-sm text-muted">No hay próximos partidos programados.</p>

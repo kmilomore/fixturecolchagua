@@ -1,7 +1,12 @@
+import { useEffect, useState } from 'react'
+import { Link, useLocation } from 'react-router-dom'
+import { CalendarDays, Copy, Eye, MapPin, Radio, TriangleAlert } from 'lucide-react'
 import type { Partido } from '@/types'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
+import { buildCanonicalMatchHref, buildCurrentMatchHref } from '@/utils/matchLinks'
 import { formatPartidoDateKey, formatPartidoTime } from '@/utils/formatDate'
 
 function estadoBadge(estado: string) {
@@ -43,10 +48,13 @@ export interface MatchCardProps {
 }
 
 export function MatchCard({ partido, onClick, className }: MatchCardProps) {
+  const location = useLocation()
+  const [copied, setCopied] = useState(false)
   const ml = partido.marcadorLocal
   const mv = partido.marcadorVisita
   const fecha = formatPartidoDateKey(partido.fecha)
   const hora = formatPartidoTime(partido.hora)
+  const detailHref = buildCurrentMatchHref(location.pathname, location.search, partido)
   const hasScore =
     partido.estado === 'finalizado' &&
     ml !== '' &&
@@ -55,6 +63,19 @@ export function MatchCard({ partido, onClick, className }: MatchCardProps) {
     mv !== null &&
     !Number.isNaN(Number(ml)) &&
     !Number.isNaN(Number(mv))
+
+  useEffect(() => {
+    if (!copied) return undefined
+    const id = window.setTimeout(() => setCopied(false), 1500)
+    return () => window.clearTimeout(id)
+  }, [copied])
+
+  async function handleCopyLink(event: React.MouseEvent<HTMLButtonElement>) {
+    event.stopPropagation()
+    if (typeof window === 'undefined' || !navigator.clipboard) return
+    await navigator.clipboard.writeText(`${window.location.origin}${buildCanonicalMatchHref(partido)}`)
+    setCopied(true)
+  }
 
   return (
     <Card
@@ -108,7 +129,21 @@ export function MatchCard({ partido, onClick, className }: MatchCardProps) {
                 VS
               </div>
             )}
-            <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted">{partido.disciplina}</p>
+            <div className="flex flex-wrap items-center justify-center gap-2 text-center">
+              {partido.estado === 'en_curso' ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/12 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-800">
+                  <Radio className="h-3.5 w-3.5" />
+                  En vivo
+                </span>
+              ) : null}
+              {partido.estado === 'postergado' ? (
+                <span className="inline-flex items-center gap-1 rounded-full bg-accent/10 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-accent">
+                  <TriangleAlert className="h-3.5 w-3.5" />
+                  Postergado
+                </span>
+              ) : null}
+              <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted">{partido.disciplina}</p>
+            </div>
           </div>
 
           <div className="text-left md:text-right">
@@ -117,9 +152,29 @@ export function MatchCard({ partido, onClick, className }: MatchCardProps) {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-black/5 pt-3">
-          <p className="text-sm text-muted">{partido.lugar}</p>
-          <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted">{partido.disciplina}</p>
+        <div className="grid gap-3 border-t border-black/5 pt-3 sm:grid-cols-[1fr_auto] sm:items-center">
+          <div className="flex flex-wrap items-center gap-3 text-sm text-muted">
+            <span className="inline-flex items-center gap-1.5">
+              <MapPin className="h-4 w-4" />
+              {partido.lugar || 'Sin recinto'}
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <CalendarDays className="h-4 w-4" />
+              {fecha} · {hora || '--:--'}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-2 sm:justify-end">
+            <Button asChild type="button" size="sm" onClick={(event) => event.stopPropagation()}>
+              <Link to={detailHref}>
+                <Eye className="h-4 w-4" />
+                Ver detalle
+              </Link>
+            </Button>
+            <Button type="button" size="sm" variant="outline" onClick={handleCopyLink}>
+              <Copy className="h-4 w-4" />
+              {copied ? 'Copiado' : 'Copiar link'}
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>
