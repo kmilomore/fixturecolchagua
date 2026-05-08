@@ -217,6 +217,9 @@ disciplinaId
 genero
 categoria
 fase
+partidoId
+campeonatoId
+rapida
 ```
 
 ### Significado
@@ -225,6 +228,9 @@ fase
 - `genero`: filtro de rama competitiva.
 - `categoria`: categoría deportiva activa.
 - `fase`: grupos, semifinal, final, etc.
+- `partidoId`: partido a abrir en detalle contextual sobre la vista actual.
+- `campeonatoId`: refuerzo para resolver el detalle compartido desde el shell global.
+- `rapida`: shortcut operativo de `PartidosPage` para filtros como `hoy`, `manana` o `en_vivo`.
 
 ### Decisión de arquitectura
 
@@ -235,6 +241,12 @@ Si se pierde esa persistencia:
 - el usuario siente que la app “reinicia” el campeonato,
 - la navegación interna se vuelve confusa,
 - y el módulo deja de comportarse como una experiencia continua.
+
+En la iteración actual, esto ya no aplica solo a filtros visuales. También aplica al detalle de partido compartible:
+
+- el usuario puede llegar desde un link directo a un partido,
+- abrir el detalle sobre la vista existente,
+- y conservar disciplina/género/categoría/fase mientras consulta ese encuentro.
 
 ---
 
@@ -279,6 +291,8 @@ Hoy concentra:
 
 `CalendarioPage` renderiza el calendario mensual real según filtros activos.
 
+Además, ahora permite abrir el detalle unificado del partido desde la lista móvil y desde las celdas del mes.
+
 ### 5. Grupos
 
 `GruposPage` muestra grupos y tablas, ahora con lectura rápida antes de cada tabla.
@@ -290,6 +304,12 @@ Hoy concentra:
 ### 7. Partidos
 
 `PartidosPage` pasó de lista plana a agrupación por fecha con contadores por estado.
+
+En esta iteración sumó:
+
+- accesos rápidos `Todos`, `Hoy`, `Mañana`, `En vivo`,
+- índice sticky por fecha,
+- y compatibilidad explícita con deep links de partido.
 
 ---
 
@@ -313,6 +333,13 @@ Hoy concentra:
 - `src/pages/campeonato/GroupTableBlock.tsx`
 - `src/components/BracketView.tsx`
 - `src/components/MatchCard.tsx`
+- `src/components/MatchDetailDialog.tsx`
+- `src/components/GlobalMatchDetailController.tsx`
+- `src/components/GlobalHeaderSearch.tsx`
+
+### Utilidades relevantes para esta iteración
+
+- `src/utils/matchLinks.ts`
 
 ### Contexto compartido
 
@@ -333,6 +360,12 @@ Esto permite que:
 - el usuario mantenga la disciplina actual,
 - no pierda género/categoría/fase al cambiar de pestaña,
 - y recorra el módulo sin reconfigurar filtros una y otra vez.
+
+Ahora también permite que:
+
+- un deep link abra un partido específico sobre la vista actual,
+- el usuario cierre el detalle y vuelva exactamente al mismo contexto,
+- y el campeonato siga sintiéndose como una única experiencia continua.
 
 ### 2. Banner más fuerte en el layout
 
@@ -356,6 +389,8 @@ Objetivo:
 - reforzar continuidad de contexto,
 - y permitir navegación rápida entre vistas.
 
+El índice sticky por fecha de `PartidosPage` sigue la misma lógica: menos scroll ciego y más orientación directa dentro de jornadas largas.
+
 ### 4. Home del campeonato como dashboard
 
 La home interna ya no se limita a descripción + botones.
@@ -376,6 +411,12 @@ Ahora:
 - agrupa por fecha,
 - ordena por estado y hora,
 - y agrega conteos por bloque.
+
+Además:
+
+- permite filtros rápidos de jornada,
+- agrega un índice de salto por fecha,
+- y deja cada partido listo para abrir detalle o copiar link.
 
 Esto mejora escaneabilidad y lectura operativa.
 
@@ -405,6 +446,22 @@ Se reforzaron visualmente:
 
 - `MatchCard`,
 - `GroupTable`.
+
+`MatchCard` también se volvió más operativo:
+
+- refuerza estado,
+- muestra recinto y fecha/hora en la base,
+- y expone acciones directas `Ver detalle` y `Copiar link`.
+
+### 9. El campeonato ya puede abrir partidos como destino directo
+
+El módulo no tiene todavía una página dedicada `PartidoPage`, pero ya soporta un patrón intermedio muy útil:
+
+- el usuario entra por un deep link,
+- el shell resuelve `partidoId` + `campeonatoId`,
+- y el detalle aparece como overlay sin romper el resto de la navegación.
+
+Esto permite compartir partidos hoy sin introducir una nueva jerarquía de rutas completa.
 
 Objetivo:
 
@@ -437,6 +494,13 @@ Objetivo:
 3. La vista conserva `disciplinaId`, `genero`, `categoria`, `fase`.
 4. El módulo se comporta como una sola experiencia, no como pantallas desconectadas.
 
+### Flujo 3.1. Abrir un partido desde deep link
+
+1. El usuario abre un enlace público a `/campeonatos/:id/partidos?...&partidoId=...&campeonatoId=...`.
+2. `AppShell` monta el controlador global del detalle.
+3. Se consulta el fixture del campeonato para resolver el partido solicitado.
+4. El detalle se abre encima de la vista y al cerrarse conserva el resto del contexto.
+
 ### Flujo 4. Revisar grupos y tabla
 
 1. La vista carga grupos del filtro actual.
@@ -450,6 +514,13 @@ Objetivo:
 2. Filtra por categoría si corresponde.
 3. Deriva semifinales, final y tercer lugar.
 4. `BracketView` renderiza el cuadro y al campeón si ya existe definición.
+
+### Flujo 6. Buscar y abrir partidos rápido
+
+1. El usuario usa el buscador global del header.
+2. Si encuentra un partido, navega al deep link canónico del encuentro.
+3. Si busca un establecimiento, se deriva a `Mis partidos` con `?search=`.
+4. Desde tarjetas o calendario puede volver a abrir el detalle sin perder el contexto general.
 
 ---
 
@@ -487,6 +558,10 @@ Hallazgo confirmado:
 - reducir tamaño visual no resuelve por sí solo la UX,
 - lo importante es ordenar por fecha/estado y resumir.
 
+La iteración actual confirma un complemento igual de importante:
+
+- además de resumir, la vista necesita atajos claros de entrada (`Hoy`, `Mañana`, `En vivo`) y saltos por fecha.
+
 ### 5. `GruposPage` y `FasesPage` ganan mucho valor con lectura editorial mínima
 
 No hace falta inventar nuevos datos para mejorar UX.
@@ -509,6 +584,11 @@ Eso cambia el criterio de diseño:
 - más contexto,
 - más agrupación,
 - y mejor jerarquía visual.
+
+También cambia el rol del shell:
+
+- ya no solo navega,
+- ahora sirve como punto de acceso rápido a partidos concretos mediante buscador global y overlay compartido.
 
 ---
 
@@ -560,8 +640,10 @@ La build actual ya advierte chunk grande. Si el módulo sigue ganando riqueza vi
 ## Cosas que conviene evitar
 
 - No romper la persistencia de `disciplinaId`, `genero`, `categoria`, `fase` entre rutas internas.
+- No romper la persistencia de `partidoId`, `campeonatoId` y `rapida` cuando el flujo de la vista dependa de deep links o shortcuts de jornada.
 - No volver a convertir `CampeonatoHome` en una portada vacía sin datos de seguimiento.
 - No hacer que `PartidosPage` vuelva a una lista plana sin agrupación por fecha.
+- No quitar el índice sticky por fecha si el volumen de partidos sigue creciendo; resuelve orientación real, no solo decoración.
 - No renderizar `GruposPage` como una secuencia muda de tablas sin lectura rápida.
 - No tratar `FasesPage` solo como dibujo de llaves sin narrativa del estado competitivo.
 - No esconder la disciplina activa en el banner del campeonato.
@@ -569,6 +651,7 @@ La build actual ya advierte chunk grande. Si el módulo sigue ganando riqueza vi
 - No asumir que el usuario recuerda el filtro activo si la UI no lo hace visible.
 - No duplicar lógica de filtros en cada página hija cuando el layout ya controla ese contexto.
 - No introducir nuevos filtros sin decidir primero cómo persistirlos y mostrarlos.
+- No volver a dejar `CalendarView` como vista pasiva si el resto del sistema ya permite abrir detalle contextual del partido.
 
 ---
 
@@ -609,6 +692,10 @@ Actualmente el módulo de campeonatos ya cuenta con:
 - grupos con lectura rápida,
 - fases con narrativa,
 - partidos agrupados por fecha,
+- detalle unificado de partido por overlay,
+- deep links públicos por partido,
+- buscador global integrado al shell,
+- shortcuts operativos de jornada,
 - y componentes base visualmente más cohesionados.
 
 En el contexto general de la aplicación, este módulo representa la experiencia pública más completa y reusable del sistema.

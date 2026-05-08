@@ -76,6 +76,15 @@ Además de este contexto general, existen documentos específicos para módulos 
 - Navegación móvil sin duplicidad entre `Campeonatos` y `Fixture`, con acceso directo al campeonato activo.
 - Shell público refinado para móvil: header más compacto, navbar inferior con mejor separación táctil y sin keys duplicadas al resolver el fixture activo.
 - Estados vacíos y errores más útiles en `Mis partidos` y `Admin resultados`.
+- Detalle unificado de partido abierto desde query params (`partidoId`, `campeonatoId`) y disponible desde home, calendario, listados y búsqueda global.
+- Deep links públicos por partido hacia el campeonato correspondiente, con enlace copiable desde tarjetas y diálogo de detalle.
+- Buscador global en el header para saltar directo a partidos o derivar una búsqueda pública hacia `Mis partidos`.
+- `Mis partidos` ahora incorpora autocompletado por establecimiento, favoritos persistidos en `localStorage` y sincronización del texto de búsqueda en la URL.
+- `PartidosPage` suma filtros rápidos de jornada (`Hoy`, `Mañana`, `En vivo`) e índice sticky por fecha para saltar directamente a la jornada deseada.
+- `DisciplineFilter` agrega hoja inferior móvil para edición de filtros sin depender solo de scroll horizontal.
+- `HomePage` prioriza una CTA principal `Ver próximo partido` cuando existe un siguiente encuentro disponible.
+- `CalendarView` abre el detalle unificado del partido al seleccionar un encuentro en lista o calendario mensual.
+- `MatchCard` refuerza estado operativo, recinto, fecha/hora y acciones rápidas (`Ver detalle`, `Copiar link`).
 - Feedback transaccional visible al guardar resultados y recálculo de tablas.
 - Saneamiento básico de strings provenientes de Google Sheets antes de exponerlos al frontend.
 - Persistencia del filtro de disciplina, género, categoría y fase al navegar entre Resumen, Calendario, Grupos, Fases y Partidos dentro de un campeonato.
@@ -299,6 +308,8 @@ Consideraciones de UX ya implementadas para navegación por campeonato:
 - El filtro se persiste en query params mediante `disciplinaId`, `genero`, `categoria` y `fase`.
 - La navegación interna del campeonato debe conservar esos query params para no perder el contexto al cambiar de vista.
 - El banner del campeonato y el bloque del filtro deben dejar visible la disciplina actualmente seleccionada.
+- El detalle de partido también puede abrirse por query params sobre la vista actual, usando `partidoId` y `campeonatoId` sin romper el contexto previo del campeonato.
+- La búsqueda global del header puede derivar al usuario a un deep link de partido o a `/mis-partidos?search=...` según el tipo de coincidencia.
 
 ### POST
 
@@ -426,6 +437,11 @@ En ese modo, `disciplinaId` deja de ser obligatorio porque el backend lo resuelv
 - `/campeonatos/:id/fases`: bracket eliminatorio.
 - `/campeonatos/:id/partidos`: listado de partidos.
 
+Notas de navegación pública:
+
+- No existe todavía una ruta dedicada tipo `/partidos/:id`; el detalle actual se resuelve como overlay reutilizable controlado por query params.
+- Los deep links de partido apuntan hoy a `/campeonatos/:id/partidos?...&partidoId=...&campeonatoId=...` y son la forma canónica de compartir un partido.
+
 ### Administración
 
 - `/admin`: acceso admin exclusivo con Google Sign-In y lista blanca de correos.
@@ -438,14 +454,18 @@ Las rutas `/admin/resultados` y `/campeonatos/nuevo` están envueltas en `<Requi
 
 - `src/api/gasClient.ts`: cliente tipado hacia GAS. Incluye `fetchWithTimeout` con `AbortController` (15 s) aplicado a todos los GET y POST. Si GAS no responde en ese plazo, la promesa se cancela y TanStack Query recibe el error.
 - `src/types/index.ts`: contratos de datos.
+- `src/utils/matchLinks.ts`: construcción y limpieza de deep links de partido sobre la URL actual y en formato canónico compartible.
 - `src/components/DisciplineFilter.tsx`: filtros horizontales por disciplina/género/categoría/fase.
 - `src/components/CalendarView.tsx`: calendario mensual.
 - `src/components/MatchCard.tsx`: tarjeta de partido.
+- `src/components/MatchDetailDialog.tsx`: detalle unificado del partido con acciones rápidas y enlace copiable.
+- `src/components/GlobalMatchDetailController.tsx`: controlador global que abre el detalle del partido desde query params en cualquier vista dentro de `AppShell`.
+- `src/components/GlobalHeaderSearch.tsx`: buscador global del header para partidos, recintos, disciplinas y derivación a `Mis partidos`.
 - `src/components/GroupTable.tsx`: tabla de posiciones.
 - `src/components/BracketView.tsx`: bracket de semifinales, final, tercer lugar y campeón.
 - `src/components/CampeonatoForm.tsx`: wizard de campeonato.
 - `src/components/AppShell.tsx`: layout general, header, logo y navbar móvil.
-- `src/components/AppShell.tsx` también concentra parte importante de la identidad pública: header, estados activos de navegación, navbar móvil y contenedor visual del shell.
+- `src/components/AppShell.tsx` también concentra parte importante de la identidad pública: header, estados activos de navegación, buscador global, navbar móvil, overlay global de detalle y contenedor visual del shell.
 - `src/components/ui/button.tsx`: variantes globales de botones. Evitar que `secondary` vuelva a ser amarillo.
 - `src/components/ui/badge.tsx`: variantes globales de badges.
 - `src/components/ui/card.tsx`: superficie visual compartida por prácticamente todas las vistas públicas y administrativas.
@@ -453,7 +473,7 @@ Las rutas `/admin/resultados` y `/campeonatos/nuevo` están envueltas en `<Requi
 - `src/pages/campeonato/*`: páginas internas del campeonato.
 - `src/pages/campeonato/CampeonatoLayout.tsx`: cabecera de campeonato con gradiente institucional.
 - `src/pages/HomePage.tsx`: hero principal, métricas rápidas y acceso editorial a vistas públicas.
-- `src/pages/MisPartidosPage.tsx`: vista pública para buscar partidos por establecimiento.
+- `src/pages/MisPartidosPage.tsx`: vista pública para buscar partidos por establecimiento, con sugerencias y favoritos.
 - `src/pages/KioscoPage.tsx`: modo kiosco/proyector con actualización automática cada 60 segundos y reloj aislado para no rerenderizar toda la vista por segundo.
 - `api/weather.ts`: proxy serverless same-origin para meteorología del kiosco en producción.
 - `src/pages/admin/AdminResultadosPage.tsx`: flujo de marcadores con feedback de guardado, selección automática de campeonato activo y estados vacíos operativos.
@@ -510,9 +530,14 @@ Utilidades visuales ya introducidas en `src/index.css`:
 - La creación de campeonatos es una función administrativa. No debe aparecer como acción pública en home/listados.
 - El home muestra un bloque de próximo partido y partidos de hoy usando el campeonato activo, pero ahora consume un resumen agregado desde GAS en vez de pedir el fixture completo.
 - El home evolucionó a una portada más editorial con hero, CTAs principales y métricas rápidas. Si se simplifica, no perder esa jerarquía visual.
+- El home ahora debe priorizar una CTA explícita a `Ver próximo partido` cuando exista `siguiente` en el resumen del campeonato activo.
 - La navegación móvil usa acceso directo al fixture del campeonato activo para reducir fricción de consulta.
-- El `AppShell` debe conservar el navbar móvil con targets táctiles claros y estados activos visibles. Cambios menores en clases pueden degradar mucho la experiencia en celular.
-- La vista `Mis partidos` filtra por coincidencia parcial en `localNombre`, `visitaNombre`, `localId` y `visitaId`, y muestra estados vacíos guiados cuando no hay campeonato, no hay resultados o no se ha iniciado búsqueda.
+- El `AppShell` debe conservar el navbar móvil con targets táctiles claros y estados activos visibles. Ahora también hospeda un buscador global y un controlador de detalle de partido compartido; cambios en su estructura pueden romper acceso rápido o deep links.
+- La vista `Mis partidos` ya no depende solo de coincidencia parcial sobre nombres/IDs de equipos; ahora cruza además `equipos.establecimiento`, expone sugerencias reales y persiste favoritos locales.
+- El detalle unificado del partido se resuelve a nivel de shell y no debe duplicarse página por página salvo que se cree una ruta dedicada futura.
+- `PartidosPage` expone un query param adicional `rapida` para accesos rápidos de jornada (`hoy`, `manana`, `en_vivo`). Si se agrega otro filtro rápido, documentarlo junto a esta convención.
+- `DisciplineFilter` ya no debe considerarse solo una barra horizontal: en móvil existe una hoja inferior para cambiar disciplina, género, categoría y fase sin saturar el ancho disponible.
+- `CalendarView` ya no es solo lectura; cualquier partido tocable debe poder abrir detalle contextual mediante `onSelectMatch`.
 - `CampeonatoLayout` y `DisciplineFilter` son las piezas más sensibles del responsive en vistas internas. Si reaparecen cortes horizontales o apilamientos forzados, revisar primero esos dos archivos.
 - El modo kiosco consulta partidos cada 60 segundos mediante TanStack Query (`refetchInterval`) y usa el endpoint resumido para reducir carga de red y procesamiento.
 - El modo kiosco complementa `vista=resumen` con consulta completa de partidos y equipos para construir filtros internos, historial, alertas y vista completa por escuela.
@@ -548,6 +573,9 @@ Utilidades visuales ya introducidas en `src/index.css`:
 - No quitar el `fetchWithTimeout` de `gasClient.ts`; sin él, las llamadas a GAS pueden colgar indefinidamente ante una respuesta lenta del backend.
 - No volver a duplicar en móvil accesos que lleven al mismo destino, como `Campeonatos` y `Fixture` apuntando ambos a `/campeonatos`.
 - No usar el query completo de partidos en home o kiosco si el resumen agregado cubre la necesidad.
+- No romper ni renombrar sin migración los query params `partidoId`, `campeonatoId` y `rapida`; hoy forman parte del flujo público compartible de consulta rápida.
+- No quitar del `AppShell` el controlador global de detalle si el resto de la UI sigue generando deep links por query params.
+- No devolver `Mis partidos` a un input plano sin sugerencias o favoritos; el flujo actual ya asume descubrimiento guiado por establecimiento.
 - No asumir que hacer una tarjeta más pequeña resuelve por sí solo el desborde en fullscreen; en el kiosco el control real suele ser cantidad visible por bloque.
 - No usar amarillo/dorado para acciones principales; la paleta actual usa azul profundo, azul SLEP, rojo y gris claro.
 - No cambiar el logo por otro archivo sin actualizar `index.html`, `AppShell` y la portada.
@@ -576,7 +604,6 @@ Después de cambiar archivos `gas/*.gs`, copiar/actualizar en Apps Script y rede
 - Si el módulo kiosco gana más modos operativos por escuela o por recinto, documentarlos primero en `KIOKO_CONTEX.MD` y luego resumirlos aquí.
 
 - Agregar botón admin para ejecutar importación desde el frontend.
-- Agregar vista de detalle de partido.
 - Agregar generación automática de grupos desde `import_temp`.
 - Mantener lista blanca de correos admin, expiración razonable de sesión y rotación del cliente OAuth cuando cambie el entorno.
 - Evaluar autorrotación real del modo kiosco por jornada/cancha si se usará en pantallas físicas.
