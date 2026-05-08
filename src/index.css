@@ -12,6 +12,9 @@
   --color-card: #ffffff;
   --color-text: #1a1a2e;
   --color-muted: #6b7280;
+  --shadow-soft: 0 18px 50px -24px rgba(20, 30, 75, 0.22);
+  --shadow-lift: 0 24px 60px -28px rgba(20, 30, 75, 0.35);
+  --ring-soft: inset 0 1px 0 rgba(255, 255, 255, 0.7);
   --gradient-hero: linear-gradient(135deg, #25306b 0%, #2c3d9e 100%);
   --gradient-brand: linear-gradient(135deg, #25306b 0%, #006bb9 100%);
   --gradient-alert: linear-gradient(135deg, #ff1d3d 0%, #edf0f5 100%);
@@ -28,12 +31,66 @@ body {
   font-family: 'DM Sans', system-ui, sans-serif;
   color: var(--color-text);
   background:
-    radial-gradient(circle at top, rgba(0, 107, 185, 0.12), transparent 34%),
-    linear-gradient(180deg, #f7f9fc 0%, #edf0f5 42%, #e8ecf4 100%);
+    radial-gradient(circle at top left, rgba(0, 107, 185, 0.18), transparent 28%),
+    radial-gradient(circle at 85% 12%, rgba(255, 29, 61, 0.08), transparent 18%),
+    radial-gradient(circle at bottom right, rgba(37, 48, 107, 0.08), transparent 22%),
+    linear-gradient(180deg, #f8fbff 0%, #eef2f8 40%, #e7edf6 100%);
   overflow-x: hidden;
 }
 
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.4) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.35) 1px, transparent 1px);
+  background-size: 32px 32px;
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.25), transparent 70%);
+  opacity: 0.35;
+  z-index: -1;
+}
+
+::selection {
+  background: rgba(0, 107, 185, 0.18);
+  color: var(--color-primary);
+}
+
+@layer base {
+  h1,
+  h2,
+  h3,
+  h4 {
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+}
+
 @layer utilities {
+  .surface-panel {
+    position: relative;
+    overflow: hidden;
+  }
+  .surface-panel::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.32), transparent 38%, transparent 70%, rgba(37, 48, 107, 0.04));
+    opacity: 0;
+    transition: opacity 180ms ease;
+  }
+  .surface-panel:hover::after {
+    opacity: 1;
+  }
+  .glass-strip {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(255, 255, 255, 0.72));
+    backdrop-filter: blur(18px);
+  }
   .no-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;

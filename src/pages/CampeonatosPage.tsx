@@ -50,7 +50,7 @@ export function CampeonatosPage() {
 
       <div className="grid gap-4 md:grid-cols-2">
         {(q.data || []).map((c) => (
-          <Card key={c.id} className="border-primary/10 bg-white/95 hover:shadow-md">
+          <Card key={c.id} className="border-primary/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(247,250,255,0.94))]">
             <CardHeader>
               <CardTitle className="text-xl">{c.nombre}</CardTitle>
               <CardDescription>

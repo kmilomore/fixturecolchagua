@@ -70,7 +70,7 @@ export function CampeonatoHome() {
   return (
     <div className="space-y-6">
       <div className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
-        <Card className="overflow-hidden border-primary/10 bg-[linear-gradient(135deg,rgba(37,48,107,0.08),rgba(0,107,185,0.05),rgba(255,255,255,0.96))]">
+        <Card className="overflow-hidden border-primary/10 bg-[linear-gradient(135deg,rgba(37,48,107,0.1),rgba(0,107,185,0.06),rgba(255,255,255,0.98))]">
           <CardHeader className="space-y-4">
             <div className="flex flex-wrap items-center gap-2">
               <Badge className="bg-primary text-white">Dashboard</Badge>
@@ -86,7 +86,7 @@ export function CampeonatoHome() {
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             {kpis.map((item) => (
-              <div key={item.label} className="rounded-2xl border border-primary/10 bg-white/90 p-4 shadow-sm">
+              <div key={item.label} className="glass-strip rounded-2xl border border-white/80 p-4 shadow-[var(--shadow-soft)]">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted">{item.label}</p>
                 <p className={`mt-2 font-score text-3xl font-bold sm:text-4xl ${item.tone}`}>{item.value}</p>
               </div>
@@ -126,7 +126,7 @@ export function CampeonatoHome() {
           </CardHeader>
           <CardContent>
             {siguiente ? (
-              <div className="space-y-4 rounded-2xl border border-primary/10 bg-primary/5 p-5">
+              <div className="space-y-4 rounded-[24px] border border-primary/10 bg-[linear-gradient(135deg,rgba(37,48,107,0.08),rgba(0,107,185,0.04),rgba(255,255,255,0.9))] p-5">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge>{siguiente.genero}</Badge>
                   <Badge variant="secondary">{siguiente.categoria}</Badge>
@@ -158,7 +158,7 @@ export function CampeonatoHome() {
           </CardHeader>
           <CardContent className="space-y-3">
             {partidosDeHoy.slice(0, 4).map((partido) => (
-              <div key={partido.id} className="rounded-xl border border-primary/10 bg-white p-4">
+              <div key={partido.id} className="rounded-2xl border border-primary/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(247,250,255,0.94))] p-4 shadow-[var(--shadow-soft)]">
                 <div className="flex items-center justify-between gap-2">
                   <p className="font-score text-xl font-bold text-secondary">{formatPartidoTime(partido.hora)}</p>
                   <Badge variant={partido.estado === 'en_curso' ? 'live' : 'default'}>{partido.estado}</Badge>

@@ -8,8 +8,8 @@ import { cn } from '@/lib/utils'
 
 function linkClass({ isActive }: { isActive: boolean }) {
   return cn(
-    'flex flex-col items-center gap-1 rounded-lg px-3 py-2 text-xs font-semibold md:flex-row md:text-sm',
-    isActive ? 'bg-white/15 text-white' : 'text-white/80 hover:bg-white/10',
+    'flex flex-col items-center gap-1 rounded-xl px-3 py-2 text-xs font-semibold transition duration-200 md:flex-row md:text-sm',
+    isActive ? 'bg-white text-primary shadow-[0_16px_32px_-20px_rgba(0,0,0,0.55)]' : 'text-white/80 hover:bg-white/10 hover:text-white',
   )
 }
 
@@ -36,7 +36,7 @@ export function AppShell() {
 
   return (
     <div className="flex min-h-dvh flex-col bg-transparent pb-24 md:pb-0">
-      <header className="sticky top-0 z-40 border-b border-white/10 bg-primary/95 text-white shadow-sm backdrop-blur">
+      <header className="sticky top-0 z-40 border-b border-white/10 bg-[linear-gradient(135deg,rgba(37,48,107,0.96),rgba(0,107,185,0.88))] text-white shadow-[0_20px_50px_-32px_rgba(20,30,75,0.95)] backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-5">
           <NavLink to="/" className="flex min-w-0 items-center gap-3">
             <div className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-white/30 sm:h-11 sm:w-11">
@@ -59,7 +59,8 @@ export function AppShell() {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-3 py-4 sm:px-4 sm:py-6">
+      <main className="relative mx-auto w-full max-w-6xl flex-1 px-3 py-4 sm:px-4 sm:py-6">
+        <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-40 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.8),transparent_70%)]" />
         <Outlet />
       </main>
 

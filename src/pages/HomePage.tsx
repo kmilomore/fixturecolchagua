@@ -67,18 +67,25 @@ export function HomePage() {
 
   const siguiente = partidosQ.data?.siguiente || null
   const hoy = partidosQ.data?.hoy || []
+  const heroStats = [
+    { label: 'Campeonatos activos', value: activos.length || (q.data || []).length || 0 },
+    { label: 'Partidos hoy', value: partidosQ.data?.totalHoy || 0 },
+    { label: 'Próxima disciplina', value: siguiente?.disciplina || 'Por definir' },
+  ]
 
   return (
     <div className="space-y-8">
-      <section className="overflow-hidden rounded-2xl border border-white/10 bg-[image:var(--gradient-brand)] p-[1px] shadow-sm">
-        <div className="rounded-2xl bg-[image:var(--gradient-brand)] px-4 py-8 text-white sm:px-6 sm:py-10">
-          <div className="flex flex-col gap-6 md:flex-row md:items-center">
+      <section className="overflow-hidden rounded-[28px] border border-white/10 bg-[image:var(--gradient-brand)] p-[1px] shadow-[0_30px_80px_-38px_rgba(20,30,75,0.7)]">
+        <div className="relative rounded-[28px] bg-[image:linear-gradient(135deg,rgba(37,48,107,0.96),rgba(0,107,185,0.88))] px-4 py-8 text-white sm:px-6 sm:py-10">
+          <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-1/2 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.16),transparent_58%)] md:block" />
+          <div className="relative flex flex-col gap-6 md:flex-row md:items-center">
             <div className="grid h-20 w-20 shrink-0 place-items-center rounded-2xl bg-white p-3 shadow-lg sm:h-24 sm:w-24">
               <img src="/SLEPCOLCHAGUA.webp" alt="SLEP Colchagua" className="h-full w-full object-contain" />
             </div>
             <div className="min-w-0">
-              <p className="font-display text-2xl font-semibold tracking-wide sm:text-3xl md:text-4xl">Campeonato Deportivo</p>
-              <p className="mt-2 max-w-2xl text-sm text-white/80 md:text-base">
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-white/65">Portal oficial del fixture</p>
+              <p className="mt-2 font-display text-2xl font-semibold tracking-wide sm:text-3xl md:text-5xl">Campeonato Deportivo</p>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-white/80 md:text-base">
                 Encuentra rápidamente tus partidos, revisa el calendario y sigue resultados del campeonato.
               </p>
               <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
@@ -91,6 +98,14 @@ export function HomePage() {
                 <Button asChild variant="outline" className="w-full border-white/30 bg-white/5 text-white hover:bg-white/10 sm:w-auto">
                   <Link to="/kiosco">Modo kiosco</Link>
                 </Button>
+              </div>
+              <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                {heroStats.map((item) => (
+                  <div key={item.label} className="glass-strip rounded-2xl border border-white/15 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/65">{item.label}</p>
+                    <p className="mt-2 font-display text-xl font-semibold text-white sm:text-2xl">{item.value}</p>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
