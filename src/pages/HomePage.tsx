@@ -101,9 +101,12 @@ export function HomePage() {
               </div>
               <div className="mt-6 grid gap-3 sm:grid-cols-3">
                 {heroStats.map((item) => (
-                  <div key={item.label} className="glass-strip rounded-2xl border border-white/15 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/65">{item.label}</p>
-                    <p className="mt-2 font-display text-xl font-semibold text-white sm:text-2xl">{item.value}</p>
+                  <div
+                    key={item.label}
+                    className="rounded-2xl border border-white/35 bg-[linear-gradient(180deg,rgba(255,255,255,0.94),rgba(237,242,250,0.86))] px-4 py-3 shadow-[0_14px_34px_-24px_rgba(8,15,52,0.7)] backdrop-blur"
+                  >
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary/70">{item.label}</p>
+                    <p className="mt-2 font-display text-xl font-semibold text-primary sm:text-2xl">{item.value}</p>
                   </div>
                 ))}
               </div>

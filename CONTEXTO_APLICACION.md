@@ -74,12 +74,16 @@ Además de este contexto general, existen documentos específicos para módulos 
 - Endpoint resumido de partidos para home y kiosco mediante `?resource=partidos&vista=resumen`.
 - Sesión admin con expiración local en `sessionStorage` para no reutilizar tokens indefinidamente.
 - Navegación móvil sin duplicidad entre `Campeonatos` y `Fixture`, con acceso directo al campeonato activo.
+- Shell público refinado para móvil: header más compacto, navbar inferior con mejor separación táctil y sin keys duplicadas al resolver el fixture activo.
 - Estados vacíos y errores más útiles en `Mis partidos` y `Admin resultados`.
 - Feedback transaccional visible al guardar resultados y recálculo de tablas.
 - Saneamiento básico de strings provenientes de Google Sheets antes de exponerlos al frontend.
 - Persistencia del filtro de disciplina, género, categoría y fase al navegar entre Resumen, Calendario, Grupos, Fases y Partidos dentro de un campeonato.
 - Refuerzo visual de la disciplina activa en el módulo de campeonato: tabs con mayor contraste, bloque de filtro con disciplina seleccionada y badge visible en el banner.
+- Navegación interna del campeonato optimizada para responsive: barra sticky con scroll horizontal, filtros separados por franjas y calendario móvil con selector claro entre lista y mes.
 - Visibilidad explícita de la disciplina en los resúmenes públicos: `Próximo partido` de la home y tarjetas de `KioscoPage` para siguiente partido, partidos de hoy y próximos encuentros.
+- Home y dashboard del campeonato con jerarquía visual reforzada: hero más editorial, métricas rápidas, cards con elevación suave y mejor lectura en celular.
+- Sistema visual base refinado en componentes UI: `Card`, `Button`, `Badge` e `Input` ahora comparten sombras suaves, bordes más limpios, gradientes institucionales y microinteracciones consistentes.
 - Proxy same-origin `/api/weather` para meteorología del kiosco, evitando dependencia directa de `connect-src` externo en el navegador.
 - Kiosco con fullscreen sin scroll, compactación automática por resolución y contención estricta de bloques secundarios.
 - Modo kiosco filtrable por escuela usando `equipos.establecimiento`, con persistencia local de la selección.
@@ -108,7 +112,20 @@ Archivos donde se aplica la paleta:
 - `frontend/src/index.css`
 - `frontend/src/components/ui/button.tsx`
 - `frontend/src/components/ui/badge.tsx`
+- `frontend/src/components/ui/card.tsx`
+- `frontend/src/components/ui/input.tsx`
+- `frontend/src/components/AppShell.tsx`
 - `frontend/src/pages/campeonato/CampeonatoLayout.tsx`
+
+Dirección visual actual implementada:
+
+- Fondo general con capas suaves de gradiente y textura tenue, evitando una superficie plana.
+- Header principal con gradiente institucional y profundidad más marcada, manteniendo lectura clara del logo y navegación.
+- Cards como superficies elevadas, con borde claro, sombreado suave y un brillo sutil en hover.
+- Botones primarios con gradiente azul institucional; botones secundarios y outline conservan contraste alto sin caer en tonos amarillos.
+- Badges con tracking alto y tono más editorial para reforzar estados, género, fase y disciplina.
+- Inputs con tratamiento visual consistente al resto del sistema, usando borde suave, sombra ligera y fondo más pulido.
+- La home y el resumen del campeonato deben sentirse como piezas de portada, no solo como una grilla funcional de tarjetas.
 
 Nota importante: se eliminó el uso visual amarillo en botones. Si aparece un botón amarillo, revisar clases `bg-secondary`, caché de Vite/Tailwind o recargar con `Ctrl + F5`.
 
@@ -428,10 +445,14 @@ Las rutas `/admin/resultados` y `/campeonatos/nuevo` están envueltas en `<Requi
 - `src/components/BracketView.tsx`: bracket de semifinales, final, tercer lugar y campeón.
 - `src/components/CampeonatoForm.tsx`: wizard de campeonato.
 - `src/components/AppShell.tsx`: layout general, header, logo y navbar móvil.
+- `src/components/AppShell.tsx` también concentra parte importante de la identidad pública: header, estados activos de navegación, navbar móvil y contenedor visual del shell.
 - `src/components/ui/button.tsx`: variantes globales de botones. Evitar que `secondary` vuelva a ser amarillo.
 - `src/components/ui/badge.tsx`: variantes globales de badges.
+- `src/components/ui/card.tsx`: superficie visual compartida por prácticamente todas las vistas públicas y administrativas.
+- `src/components/ui/input.tsx`: estilo base de campos de búsqueda y formularios.
 - `src/pages/campeonato/*`: páginas internas del campeonato.
 - `src/pages/campeonato/CampeonatoLayout.tsx`: cabecera de campeonato con gradiente institucional.
+- `src/pages/HomePage.tsx`: hero principal, métricas rápidas y acceso editorial a vistas públicas.
 - `src/pages/MisPartidosPage.tsx`: vista pública para buscar partidos por establecimiento.
 - `src/pages/KioscoPage.tsx`: modo kiosco/proyector con actualización automática cada 60 segundos y reloj aislado para no rerenderizar toda la vista por segundo.
 - `api/weather.ts`: proxy serverless same-origin para meteorología del kiosco en producción.
@@ -445,13 +466,18 @@ Las rutas `/admin/resultados` y `/campeonatos/nuevo` están envueltas en `<Requi
 Las páginas internas de campeonato deben compartir el mismo estilo de marca que la página principal:
 
 - Cabecera con gradiente institucional `--gradient-brand`.
+- Fondo general con capas suaves y sin planos grises puros.
 - Logo oficial visible.
 - Navegación interna en azul profundo.
-- Filtros horizontales, no verticales.
-- Botones primarios con `bg-primary`.
-- Botones secundarios también en azul institucional, no amarillo.
-- Badges secundarios con azul suave.
+- Filtros horizontales, no verticales, con scroll horizontal explícito en pantallas pequeñas.
+- Botones primarios con presencia visual fuerte y gradiente azul institucional.
+- Botones secundarios y outline también en lenguaje institucional, no amarillo.
+- Badges secundarios con azul suave y tratamiento consistente de mayúsculas/tracking.
+- Cards elevadas con sombra suave, bordes sutiles y microinteracción ligera al hover.
+- Inputs y superficies auxiliares con el mismo lenguaje visual que las cards.
 - Filas destacadas de tablas con azul suave, no dorado/amarillo.
+- La jerarquía tipográfica debe ser visible: `font-display` para encabezados, `DM Sans` para lectura continua, descripciones con ancho controlado.
+- En móvil, la prioridad es lectura y continuidad: CTAs apilados, tabs deslizables y bloques sin cortes laterales.
 
 El filtro `DisciplineFilter` debe mostrarse como una barra horizontal:
 
@@ -460,6 +486,13 @@ VOLEIBOL | Damas | Varones | Sub14 | Grupos | Semis | Final
 ```
 
 Debe usar scroll horizontal en pantallas pequeñas, no apilar botones verticalmente.
+
+Utilidades visuales ya introducidas en `src/index.css`:
+
+- `.no-scrollbar`: oculta scrollbar visual en contenedores horizontales manteniendo scroll funcional.
+- `.surface-panel`: agrega brillo sutil de superficie al hover en cards y paneles.
+- `.glass-strip`: crea franjas translúcidas suaves para métricas, overlays y bloques de apoyo.
+- `text-wrap: balance` en headings y `text-wrap: pretty` en párrafos para mejorar ritmo de lectura.
 
 ## Hallazgos y Decisiones Importantes
 
@@ -476,8 +509,11 @@ Debe usar scroll horizontal en pantallas pequeñas, no apilar botones verticalme
 - Si no hay fases cargadas, `BracketView` muestra un mensaje claro en vez de una grilla vacía.
 - La creación de campeonatos es una función administrativa. No debe aparecer como acción pública en home/listados.
 - El home muestra un bloque de próximo partido y partidos de hoy usando el campeonato activo, pero ahora consume un resumen agregado desde GAS en vez de pedir el fixture completo.
+- El home evolucionó a una portada más editorial con hero, CTAs principales y métricas rápidas. Si se simplifica, no perder esa jerarquía visual.
 - La navegación móvil usa acceso directo al fixture del campeonato activo para reducir fricción de consulta.
+- El `AppShell` debe conservar el navbar móvil con targets táctiles claros y estados activos visibles. Cambios menores en clases pueden degradar mucho la experiencia en celular.
 - La vista `Mis partidos` filtra por coincidencia parcial en `localNombre`, `visitaNombre`, `localId` y `visitaId`, y muestra estados vacíos guiados cuando no hay campeonato, no hay resultados o no se ha iniciado búsqueda.
+- `CampeonatoLayout` y `DisciplineFilter` son las piezas más sensibles del responsive en vistas internas. Si reaparecen cortes horizontales o apilamientos forzados, revisar primero esos dos archivos.
 - El modo kiosco consulta partidos cada 60 segundos mediante TanStack Query (`refetchInterval`) y usa el endpoint resumido para reducir carga de red y procesamiento.
 - El modo kiosco complementa `vista=resumen` con consulta completa de partidos y equipos para construir filtros internos, historial, alertas y vista completa por escuela.
 - El selector de escuela del kiosco se apoya en `equipos.establecimiento` y persiste su estado en `localStorage` junto con la configuración del operador.
