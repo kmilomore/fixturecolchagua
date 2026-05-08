@@ -328,7 +328,14 @@ Hoy el modal separa dos acciones:
 - `Guardar hora y lugar`
 - `Guardar resultado`
 
-Esto es importante porque evita finalizar un partido por error cuando solo se quiere corregir programación.
+Esto evita finalizar un partido por error cuando solo se quiere corregir programación.
+
+La sección de resultado del modal es **adaptativa según disciplina**:
+
+- Para vóleibol: muestra filas de sets con botones toggle por equipo.
+- Para el resto: muestra inputs numéricos de marcador local y visita.
+
+En ambos casos se usa el mismo botón `Guardar resultado` y el mismo endpoint `registrarResultado`.
 
 ---
 
@@ -378,6 +385,13 @@ resource=partidos
 action=resultado
 ```
 
+Los valores de `marcadorLocal` y `marcadorVisita` dependen de la disciplina:
+
+- **Vóleibol**: representan sets ganados por cada equipo (ej. `2`, `1`).
+- **Resto**: representan el marcador final directo (ej. `68`, `55`).
+
+El contrato con el backend es idéntico en ambos casos: siempre recibe dos enteros.
+
 ### Efecto esperado del backend
 
 - actualiza marcador local,
@@ -388,7 +402,7 @@ action=resultado
 ### Efecto esperado del frontend
 
 - cierra el modal,
-- informa feedback de éxito,
+- informa feedback de éxito con el resultado final (ej. `Local 2-1 Visita (sets)`),
 - invalida queries de `partidos`,
 - invalida queries de `tabla`.
 
@@ -396,41 +410,68 @@ action=resultado
 
 ## Lógica de ingreso de resultado por disciplina
 
-El resultado no se registra de la misma forma para todas las disciplinas. El sistema debe adaptar el formulario y la validación según el deporte del partido.
+El resultado no se registra de la misma forma para todas las disciplinas. El `Dialog` adapta su formulario y validación según el partido seleccionado.
 
 ### Básquetbol
 
-- Se ingresa un **resultado final**: marcador local y marcador visita.
-- No hay sets ni parciales.
-- Se guarda directamente con `registrarResultado(id, marcadorLocal, marcadorVisita)`.
+- Se ingresan dos campos numéricos: **marcador local** y **marcador visita**.
+- El botón "Guardar resultado" se habilita cuando ambos campos tienen un número válido.
 
 ### Vóleibol
 
-- Se registra el resultado **por set**, no por marcador acumulado.
+- El `Dialog` muestra filas por set en lugar de campos numéricos.
+- Cada fila tiene dos botones toggle: uno por equipo. Al hacer click se selecciona al ganador del set; hacer click de nuevo sobre el seleccionado lo deselecciona.
 - Lógica de sets:
 
-  | Sets ganados local | Sets ganados visita | ¿Se juega set 3? |
-  |--------------------|---------------------|------------------|
-  | 2                  | 0                   | No               |
-  | 0                  | 2                   | No               |
-  | 1                  | 1                   | Sí (desempate)   |
+  | Set 1    | Set 2    | ¿Set 3?          |
+  |----------|----------|------------------|
+  | local    | local    | No · Local 2-0   |
+  | visita   | visita   | No · Visita 2-0  |
+  | local    | visita   | Sí (desempate)   |
+  | visita   | local    | Sí (desempate)   |
 
-- El partido se cierra cuando un equipo acumula **2 sets ganados**.
-- Si queda 1-1 luego del set 2, se habilita el ingreso del **set 3 de desempate**.
-- El resultado final que se persiste debe reflejar los sets ganados por cada equipo (ej.: `2-1`, `2-0`).
+- El set 3 solo aparece cuando hay empate 1-1. Debajo de los sets se muestra un texto de estado: `"Empate 1-1 · Se juega set 3"` o el resultado derivado.
+- El botón "Guardar resultado" se habilita cuando todos los sets necesarios tienen ganador.
+- Lo que se persiste en backend son **sets ganados** (ej. `2` y `1`), no scores individuales de cada set.
 
 ### Otras disciplinas
 
-- Se ingresa un **resultado final**: marcador local y marcador visita.
-- Aplica la misma lógica simple que básquetbol.
+- Igual que básquetbol: dos campos numéricos de marcador final.
 
-### Implicancias para el modal de resultados
+### Implementación actual
 
-- El formulario del `Dialog` debe detectar la disciplina del partido seleccionado.
-- Según la disciplina:
-  - **Vóleibol**: mostrar campos por set y controlar habilitación del set 3.
-  - **Resto**: mostrar campos de marcador final directo.
-- La lógica de validación (¿se puede guardar ya?) también depende de si se completaron los sets necesarios en vóleibol.
+Archivo:
+
+```txt
+src/pages/admin/AdminResultadosPage.tsx
+```
+
+Elementos clave:
+
+```ts
+type SetWinner = 'local' | 'visita' | null
+
+function esVoleibol(disciplina: string): boolean
+// detecta por regex /vol[eé]ibol/i — acepta "Vóleibol" y "Voleibol"
+
+function SetRow({ label, winner, localNombre, visitaNombre, onChange })
+// componente de fila de set con dos botones toggle
+```
+
+Estado del modal para vóleibol:
+
+```ts
+const [set1, setSet1] = useState<SetWinner>(null)
+const [set2, setSet2] = useState<SetWinner>(null)
+const [set3, setSet3] = useState<SetWinner>(null)
+
+const needsSet3 = set1 !== null && set2 !== null && set1 !== set2
+const voleiLocal  = (set1==='local'?1:0) + (set2==='local'?1:0) + (needsSet3&&set3==='local'?1:0)
+const voleiVisita = (set1==='visita'?1:0) + (set2==='visita'?1:0) + (needsSet3&&set3==='visita'?1:0)
+const voleiCompleto = set1!==null && set2!==null && (!needsSet3 || set3!==null)
+```
+
+Los sets se resetean a `null` cada vez que se abre el modal de un nuevo partido.
 
 ---
 

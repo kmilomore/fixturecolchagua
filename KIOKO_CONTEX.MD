@@ -640,6 +640,14 @@ Eso significa que el módulo no es independiente del backend. Está optimizado p
 
 Sin esos datos limpios, el kiosco perdería claridad operativa.
 
+### Nota sobre resultados de vóleibol
+
+El kiosco muestra `marcadorLocal` y `marcadorVisita` tal como los entrega el backend.
+
+Para vóleibol, esos valores representan **sets ganados** (ej. `2-1`, `2-0`), no puntos acumulados. Eso es coherente con cómo el módulo admin registra el resultado: el operador elige ganador por set y el sistema deriva el conteo de sets ganados antes de persistir.
+
+El kiosco no necesita lógica especial para diferenciar disciplinas en la visualización: el score `2-1` es igualmente legible como marcador de sets que como marcador final de otro deporte.
+
 ---
 
 ## Componentes y dependencias internas relevantes
