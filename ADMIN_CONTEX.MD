@@ -394,6 +394,46 @@ action=resultado
 
 ---
 
+## Lógica de ingreso de resultado por disciplina
+
+El resultado no se registra de la misma forma para todas las disciplinas. El sistema debe adaptar el formulario y la validación según el deporte del partido.
+
+### Básquetbol
+
+- Se ingresa un **resultado final**: marcador local y marcador visita.
+- No hay sets ni parciales.
+- Se guarda directamente con `registrarResultado(id, marcadorLocal, marcadorVisita)`.
+
+### Vóleibol
+
+- Se registra el resultado **por set**, no por marcador acumulado.
+- Lógica de sets:
+
+  | Sets ganados local | Sets ganados visita | ¿Se juega set 3? |
+  |--------------------|---------------------|------------------|
+  | 2                  | 0                   | No               |
+  | 0                  | 2                   | No               |
+  | 1                  | 1                   | Sí (desempate)   |
+
+- El partido se cierra cuando un equipo acumula **2 sets ganados**.
+- Si queda 1-1 luego del set 2, se habilita el ingreso del **set 3 de desempate**.
+- El resultado final que se persiste debe reflejar los sets ganados por cada equipo (ej.: `2-1`, `2-0`).
+
+### Otras disciplinas
+
+- Se ingresa un **resultado final**: marcador local y marcador visita.
+- Aplica la misma lógica simple que básquetbol.
+
+### Implicancias para el modal de resultados
+
+- El formulario del `Dialog` debe detectar la disciplina del partido seleccionado.
+- Según la disciplina:
+  - **Vóleibol**: mostrar campos por set y controlar habilitación del set 3.
+  - **Resto**: mostrar campos de marcador final directo.
+- La lógica de validación (¿se puede guardar ya?) también depende de si se completaron los sets necesarios en vóleibol.
+
+---
+
 ## Feedback operativo
 
 La vista de resultados usa una tarjeta de feedback para informar:

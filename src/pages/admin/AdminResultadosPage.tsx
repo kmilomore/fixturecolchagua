@@ -19,6 +19,50 @@ interface FeedbackState {
   message: string
 }
 
+type SetWinner = 'local' | 'visita' | null
+
+function esVoleibol(disciplina: string): boolean {
+  return /vol[eé]ibol/i.test(disciplina)
+}
+
+function SetRow({
+  label,
+  winner,
+  localNombre,
+  visitaNombre,
+  onChange,
+}: {
+  label: string
+  winner: SetWinner
+  localNombre: string
+  visitaNombre: string
+  onChange: (w: SetWinner) => void
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="w-32 shrink-0 text-sm text-muted">{label}</span>
+      <Button
+        type="button"
+        size="sm"
+        variant={winner === 'local' ? 'default' : 'outline'}
+        className="flex-1 truncate"
+        onClick={() => onChange(winner === 'local' ? null : 'local')}
+      >
+        {localNombre}
+      </Button>
+      <Button
+        type="button"
+        size="sm"
+        variant={winner === 'visita' ? 'default' : 'outline'}
+        className="flex-1 truncate"
+        onClick={() => onChange(winner === 'visita' ? null : 'visita')}
+      >
+        {visitaNombre}
+      </Button>
+    </div>
+  )
+}
+
 export function AdminResultadosPage() {
   const qc = useQueryClient()
   const ok = useAdminSession((s) => isAdminSessionActive(s))
@@ -30,6 +74,15 @@ export function AdminResultadosPage() {
   const [hora, setHora] = useState('')
   const [lugar, setLugar] = useState('')
   const [feedback, setFeedback] = useState<FeedbackState | null>(null)
+  const [set1, setSet1] = useState<SetWinner>(null)
+  const [set2, setSet2] = useState<SetWinner>(null)
+  const [set3, setSet3] = useState<SetWinner>(null)
+
+  const isVoleibol = selected ? esVoleibol(selected.disciplina) : false
+  const needsSet3 = set1 !== null && set2 !== null && set1 !== set2
+  const voleiLocal = (set1 === 'local' ? 1 : 0) + (set2 === 'local' ? 1 : 0) + (needsSet3 && set3 === 'local' ? 1 : 0)
+  const voleiVisita = (set1 === 'visita' ? 1 : 0) + (set2 === 'visita' ? 1 : 0) + (needsSet3 && set3 === 'visita' ? 1 : 0)
+  const voleiCompleto = set1 !== null && set2 !== null && (!needsSet3 || set3 !== null)
 
   const campeonatosQ = useQuery({
     queryKey: ['campeonatos'],
@@ -83,10 +136,16 @@ export function AdminResultadosPage() {
   const resultMut = useMutation({
     mutationFn: async () => {
       if (!selected) return
-      return api.partidos.registrarResultado(selected.id, Number(ml), Number(mv))
+      const marcadorLocal = isVoleibol ? voleiLocal : Number(ml)
+      const marcadorVisita = isVoleibol ? voleiVisita : Number(mv)
+      return api.partidos.registrarResultado(selected.id, marcadorLocal, marcadorVisita)
     },
     onSuccess: async () => {
-      const resumen = selected ? `${selected.localNombre} ${ml}-${mv} ${selected.visitaNombre}` : 'Resultado guardado.'
+      const resumen = selected
+        ? isVoleibol
+          ? `${selected.localNombre} ${voleiLocal}-${voleiVisita} ${selected.visitaNombre} (sets)`
+          : `${selected.localNombre} ${ml}-${mv} ${selected.visitaNombre}`
+        : 'Resultado guardado.'
       setOpen(false)
       setSelected(null)
       setFeedback({ tone: 'success', message: `Resultado guardado: ${resumen}` })
@@ -97,6 +156,10 @@ export function AdminResultadosPage() {
       setFeedback({ tone: 'error', message: (error as Error).message })
     },
   })
+
+  const resultadoInvalido = isVoleibol
+    ? !voleiCompleto
+    : ml === '' || mv === '' || Number.isNaN(Number(ml)) || Number.isNaN(Number(mv))
 
   if (!ok) {
     return (
@@ -236,6 +299,9 @@ export function AdminResultadosPage() {
                 setMv(pp.marcadorVisita === '' ? '' : String(pp.marcadorVisita))
                 setHora(String(pp.hora || ''))
                 setLugar(String(pp.lugar || ''))
+                setSet1(null)
+                setSet2(null)
+                setSet3(null)
                 setOpen(true)
               }}
             />
@@ -263,28 +329,64 @@ export function AdminResultadosPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 border-t border-primary/10 pt-4">
-            <div className="space-y-2">
-              <Label htmlFor="marcador-local">Local</Label>
-              <Input
-                id="marcador-local"
-                inputMode="numeric"
-                className="font-score text-3xl font-bold tabular-nums"
-                value={ml}
-                onChange={(e) => setMl(e.target.value.replace(/\D+/g, ''))}
+          {isVoleibol ? (
+            <div className="space-y-3 border-t border-primary/10 pt-4">
+              <p className="text-sm font-semibold text-primary">Resultado por sets</p>
+              <SetRow
+                label="Set 1"
+                winner={set1}
+                localNombre={selected?.localNombre ?? 'Local'}
+                visitaNombre={selected?.visitaNombre ?? 'Visita'}
+                onChange={setSet1}
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="marcador-visita">Visita</Label>
-              <Input
-                id="marcador-visita"
-                inputMode="numeric"
-                className="font-score text-3xl font-bold tabular-nums"
-                value={mv}
-                onChange={(e) => setMv(e.target.value.replace(/\D+/g, ''))}
+              <SetRow
+                label="Set 2"
+                winner={set2}
+                localNombre={selected?.localNombre ?? 'Local'}
+                visitaNombre={selected?.visitaNombre ?? 'Visita'}
+                onChange={setSet2}
               />
+              {needsSet3 ? (
+                <SetRow
+                  label="Set 3 · Desempate"
+                  winner={set3}
+                  localNombre={selected?.localNombre ?? 'Local'}
+                  visitaNombre={selected?.visitaNombre ?? 'Visita'}
+                  onChange={setSet3}
+                />
+              ) : null}
+              {set1 !== null && set2 !== null ? (
+                <p className="text-sm text-muted">
+                  {needsSet3
+                    ? 'Empate 1-1 · Se juega set 3'
+                    : `${selected?.localNombre ?? 'Local'} ${voleiLocal}-${voleiVisita} ${selected?.visitaNombre ?? 'Visita'}`}
+                </p>
+              ) : null}
             </div>
-          </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 border-t border-primary/10 pt-4">
+              <div className="space-y-2">
+                <Label htmlFor="marcador-local">Local</Label>
+                <Input
+                  id="marcador-local"
+                  inputMode="numeric"
+                  className="font-score text-3xl font-bold tabular-nums"
+                  value={ml}
+                  onChange={(e) => setMl(e.target.value.replace(/\D+/g, ''))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="marcador-visita">Visita</Label>
+                <Input
+                  id="marcador-visita"
+                  inputMode="numeric"
+                  className="font-score text-3xl font-bold tabular-nums"
+                  value={mv}
+                  onChange={(e) => setMv(e.target.value.replace(/\D+/g, ''))}
+                />
+              </div>
+            </div>
+          )}
 
           {scheduleMut.isPending ? <p className="text-sm text-muted">Guardando hora y lugar del partido...</p> : null}
           {resultMut.isPending ? <p className="text-sm text-muted">Guardando resultado y recalculando tabla...</p> : null}
@@ -304,7 +406,7 @@ export function AdminResultadosPage() {
             <Button
               type="button"
               onClick={() => resultMut.mutate()}
-              disabled={scheduleMut.isPending || resultMut.isPending || !selected || ml === '' || mv === '' || Number.isNaN(Number(ml)) || Number.isNaN(Number(mv))}
+              disabled={scheduleMut.isPending || resultMut.isPending || !selected || resultadoInvalido}
             >
               {resultMut.isPending ? 'Guardando...' : 'Guardar resultado'}
             </Button>

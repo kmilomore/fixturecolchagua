@@ -35,9 +35,30 @@ var CSVImport = {
     const equipoByNombre = {};
     equipos.forEach(function (e) {
       if (e.campeonatoId === campeonatoId && e.disciplinaId === disciplinaId) {
-        const key = CSVImport.equipoKey_(e.nombre, e.genero, e.categoria);
+        const key = CSVImport.equipoKey_(e.nombre, e.genero, e.categoria, e.grupo);
         equipoByNombre[key] = e.id;
       }
+    });
+
+    rows.forEach(function (raw) {
+      const norm = CSVImport.normalizeRow_(raw);
+      const genero = CSVImport.normalizeGenero_(norm.genero || 'Damas');
+      const categoria = norm.categoria || categoriaDefault;
+      const grupo = CSVImport.normalizeGrupo_(norm.grupo || norm.numerogrupo || norm.gruponumero || '');
+
+      [norm.local || norm.localnombre || norm.equipolocal, norm.visita || norm.visitante || norm.equipovisita]
+        .forEach(function (nombreEquipo) {
+          CSVImport.ensureEquipo_({
+            campeonatoId: campeonatoId,
+            disciplinaId: disciplinaId,
+            nombre: nombreEquipo,
+            genero: genero,
+            categoria: categoria,
+            grupo: grupo,
+            equipoByNombre: equipoByNombre,
+            autoCrear: autoCrearEquipos
+          });
+        });
     });
 
     const partidosExistentes = sheetToObjects('partidos');
@@ -335,11 +356,12 @@ var CSVImport = {
     return raw;
   },
 
-  equipoKey_: function (nombre, genero, categoria) {
+  equipoKey_: function (nombre, genero, categoria, grupo) {
     return [
       CSVImport.normalizeKey_(nombre || ''),
       CSVImport.normalizeKey_(genero || ''),
-      CSVImport.normalizeKey_(categoria || '')
+      CSVImport.normalizeKey_(categoria || ''),
+      CSVImport.normalizeKey_(grupo || '')
     ].join('|');
   },
 
@@ -437,7 +459,7 @@ var CSVImport = {
     const nombre = String(options.nombre || '').trim();
     if (!nombre) return '';
 
-    const key = CSVImport.equipoKey_(nombre, options.genero, options.categoria);
+    const key = CSVImport.equipoKey_(nombre, options.genero, options.categoria, options.grupo);
     if (options.equipoByNombre[key]) {
       if (options.grupo) {
         updateRowById('equipos', options.equipoByNombre[key], { grupo: options.grupo });
@@ -463,20 +485,20 @@ var CSVImport = {
   },
 
   rebuildGrupos_: function (campeonatoId, disciplinaId) {
-    const equipos = sheetToObjects('equipos').filter(function (e) {
-      return String(e.campeonatoId) === String(campeonatoId) &&
-        String(e.disciplinaId) === String(disciplinaId) &&
-        String(e.grupo || '').trim() !== '';
+    const gruposMap = {};
+    const partidos = sheetToObjects('partidos').filter(function (p) {
+      return String(p.campeonatoId) === String(campeonatoId) &&
+        String(p.disciplinaId) === String(disciplinaId) &&
+        String(p.grupo || '').trim() !== '';
     });
 
-    const gruposMap = {};
-    equipos.forEach(function (e) {
-      const nombre = CSVImport.normalizeGrupo_(e.grupo);
+    partidos.forEach(function (p) {
+      const nombre = CSVImport.normalizeGrupo_(p.grupo);
       const key = [
         campeonatoId,
         disciplinaId,
-        CSVImport.normalizeKey_(e.genero || ''),
-        CSVImport.normalizeKey_(e.categoria || ''),
+        CSVImport.normalizeKey_(p.genero || ''),
+        CSVImport.normalizeKey_(p.categoria || ''),
         CSVImport.normalizeKey_(nombre)
       ].join('|');
 
@@ -485,15 +507,51 @@ var CSVImport = {
           campeonatoId: campeonatoId,
           disciplinaId: disciplinaId,
           nombre: nombre,
-          genero: e.genero || 'Damas',
-          categoria: e.categoria || 'Sub14',
+          genero: p.genero || 'Damas',
+          categoria: p.categoria || 'Sub14',
           equiposIds: []
         };
       }
-      if (gruposMap[key].equiposIds.indexOf(e.id) < 0) {
-        gruposMap[key].equiposIds.push(e.id);
-      }
+
+      [p.localId, p.visitaId].forEach(function (equipoId) {
+        if (equipoId && gruposMap[key].equiposIds.indexOf(equipoId) < 0) {
+          gruposMap[key].equiposIds.push(equipoId);
+        }
+      });
     });
+
+    if (!Object.keys(gruposMap).length) {
+      const equipos = sheetToObjects('equipos').filter(function (e) {
+        return String(e.campeonatoId) === String(campeonatoId) &&
+          String(e.disciplinaId) === String(disciplinaId) &&
+          String(e.grupo || '').trim() !== '';
+      });
+
+      equipos.forEach(function (e) {
+        const nombre = CSVImport.normalizeGrupo_(e.grupo);
+        const key = [
+          campeonatoId,
+          disciplinaId,
+          CSVImport.normalizeKey_(e.genero || ''),
+          CSVImport.normalizeKey_(e.categoria || ''),
+          CSVImport.normalizeKey_(nombre)
+        ].join('|');
+
+        if (!gruposMap[key]) {
+          gruposMap[key] = {
+            campeonatoId: campeonatoId,
+            disciplinaId: disciplinaId,
+            nombre: nombre,
+            genero: e.genero || 'Damas',
+            categoria: e.categoria || 'Sub14',
+            equiposIds: []
+          };
+        }
+        if (gruposMap[key].equiposIds.indexOf(e.id) < 0) {
+          gruposMap[key].equiposIds.push(e.id);
+        }
+      });
+    }
 
     const existentes = sheetToObjects('grupos');
     Object.keys(gruposMap).forEach(function (key) {
