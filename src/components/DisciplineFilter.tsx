@@ -61,69 +61,71 @@ export function DisciplineFilter({ disciplinas, categoriasDisponibles, className
   }
 
   return (
-    <div className={cn('rounded-xl border border-primary/10 bg-white p-2 shadow-sm', className)}>
-      <div className="flex items-center justify-between gap-3 border-b border-primary/10 px-1 pb-2">
+    <div className={cn('rounded-xl border border-primary/10 bg-white p-3 shadow-sm', className)}>
+      <div className="flex flex-col gap-3 border-b border-primary/10 px-1 pb-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary/55">Disciplina activa</p>
           <p className="text-sm font-semibold text-primary">{disciplinaActual?.nombre || 'Sin disciplina'}</p>
+          <p className="mt-1 text-xs text-muted">Desliza para cambiar filtros en pantallas pequeñas.</p>
         </div>
         {disciplinaActual ? <Badge className="px-3 py-1 text-[11px] uppercase tracking-wide">{disciplinaActual.nombre}</Badge> : null}
       </div>
 
-      <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap pb-1">
-        {disciplinaTabs}
+      <div className="mt-3 space-y-3">
+        <div className="no-scrollbar overflow-x-auto pb-1">
+          <div className="flex min-w-max items-center gap-2 whitespace-nowrap">{disciplinaTabs}</div>
+        </div>
 
-        <div className="h-7 w-px shrink-0 bg-primary/10" aria-hidden />
-
-        {(['Damas', 'Varones'] as const).map((g) => (
-          <Button
-            key={g}
-            type="button"
-            size="sm"
-            className="h-9 shrink-0"
-            variant={genero === g ? 'default' : 'outline'}
-            onClick={() => set({ genero: g })}
-          >
-            {g}
-          </Button>
-        ))}
-
-        {categoriasDisponibles.length ? (
-          <>
-            <div className="h-7 w-px shrink-0 bg-primary/10" aria-hidden />
-            {categoriasDisponibles.map((c) => (
-            <Button
-              key={c}
-              type="button"
-              size="sm"
-              className="h-9 shrink-0"
-              variant={categoria === c ? 'default' : 'outline'}
-              onClick={() => set({ categoria: c })}
-            >
-              {c}
-            </Button>
+        <div className="no-scrollbar overflow-x-auto pb-1">
+          <div className="flex min-w-max items-center gap-2 whitespace-nowrap">
+            {(['Damas', 'Varones'] as const).map((g) => (
+              <Button
+                key={g}
+                type="button"
+                size="sm"
+                className="h-9 shrink-0"
+                variant={genero === g ? 'default' : 'outline'}
+                onClick={() => set({ genero: g })}
+              >
+                {g}
+              </Button>
             ))}
-          </>
-        ) : null}
 
-        <div className="h-7 w-px shrink-0 bg-primary/10" aria-hidden />
+            {categoriasDisponibles.length ? <div className="h-7 w-px shrink-0 bg-primary/10" aria-hidden /> : null}
 
-        {[
-          { id: 'grupos', label: 'Grupos' },
-          { id: 'semifinal', label: 'Semis' },
-          { id: 'final', label: 'Final' },
-        ].map((f) => (
-          <Button
-            key={f.id}
-            type="button"
-            size="sm"
-            className="h-9 shrink-0"
-            variant={fase === f.id ? 'default' : 'outline'}
-            onClick={() => set({ fase: f.id })}
-          >
-            {f.label}
-          </Button>
-        ))}
+            {categoriasDisponibles.map((c) => (
+              <Button
+                key={c}
+                type="button"
+                size="sm"
+                className="h-9 shrink-0"
+                variant={categoria === c ? 'default' : 'outline'}
+                onClick={() => set({ categoria: c })}
+              >
+                {c}
+              </Button>
+            ))}
+
+            <div className="h-7 w-px shrink-0 bg-primary/10" aria-hidden />
+
+            {[
+              { id: 'grupos', label: 'Grupos' },
+              { id: 'semifinal', label: 'Semis' },
+              { id: 'final', label: 'Final' },
+            ].map((f) => (
+              <Button
+                key={f.id}
+                type="button"
+                size="sm"
+                className="h-9 shrink-0"
+                variant={fase === f.id ? 'default' : 'outline'}
+                onClick={() => set({ fase: f.id })}
+              >
+                {f.label}
+              </Button>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   )

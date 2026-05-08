@@ -43,17 +43,17 @@ export function MisPartidosPage() {
 
   return (
     <div className="space-y-6">
-      <section className="overflow-hidden rounded-2xl border border-white/20 bg-[image:var(--gradient-brand)] px-5 py-7 text-white shadow-sm">
+      <section className="overflow-hidden rounded-2xl border border-white/20 bg-[image:var(--gradient-brand)] px-4 py-6 text-white shadow-sm sm:px-5 sm:py-7">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-white/70">Vista pública</p>
-            <h1 className="font-display text-3xl font-semibold">Mis partidos</h1>
+            <h1 className="font-display text-3xl font-semibold sm:text-4xl">Mis partidos</h1>
             <p className="mt-1 max-w-2xl text-sm text-white/75">
               Busca tu establecimiento para ver solo sus partidos programados y resultados.
             </p>
           </div>
           {campeonato ? (
-            <Button asChild className="bg-white text-primary hover:bg-white/90">
+            <Button asChild className="w-full bg-white text-primary hover:bg-white/90 md:w-auto">
               <Link to={`/campeonatos/${campeonato.id}/calendario`}>Ver calendario completo</Link>
             </Button>
           ) : null}
@@ -127,11 +127,11 @@ export function MisPartidosPage() {
                 No encontramos partidos para “{search.trim()}” en {campeonato.nombre}. Prueba con una parte del nombre del establecimiento.
               </CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" onClick={() => setSearch('')}>
+            <CardContent className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => setSearch('')}>
                 Limpiar búsqueda
               </Button>
-              <Button asChild>
+              <Button asChild className="w-full sm:w-auto">
                 <Link to={`/campeonatos/${campeonato.id}/calendario`}>Ver calendario completo</Link>
               </Button>
             </CardContent>
@@ -143,11 +143,11 @@ export function MisPartidosPage() {
             <CardTitle>Empieza por tu establecimiento</CardTitle>
             <CardDescription>Escribe una parte del nombre y te mostraremos solo sus partidos y resultados.</CardDescription>
           </CardHeader>
-          <CardContent className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" onClick={() => setSearch('Liceo')}>
+          <CardContent className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={() => setSearch('Liceo')}>
               Probar con “Liceo”
             </Button>
-            <Button asChild>
+            <Button asChild className="w-full sm:w-auto">
               <Link to={`/campeonatos/${campeonato.id}/calendario`}>Ir al calendario</Link>
             </Button>
           </CardContent>

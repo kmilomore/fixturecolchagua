@@ -96,15 +96,15 @@ export function CampeonatoLayout() {
   return (
     <div className="space-y-6">
       <div className="overflow-hidden rounded-2xl border border-white/20 bg-[image:var(--gradient-brand)] shadow-sm">
-        <div className="flex flex-col gap-5 px-5 py-6 text-white">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div className="flex items-center gap-4">
-              <div className="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-white p-2 shadow">
+        <div className="flex flex-col gap-5 px-4 py-5 text-white sm:px-5 sm:py-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-start gap-3 sm:gap-4">
+              <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-white p-2 shadow sm:h-16 sm:w-16">
                 <img src="/SLEPCOLCHAGUA.webp" alt="SLEP Colchagua" className="h-full w-full object-contain" />
               </div>
-              <div className="space-y-1">
+              <div className="min-w-0 space-y-1">
                 <p className="text-xs font-semibold uppercase tracking-wide text-white/70">Campeonato</p>
-                <h1 className="font-display text-3xl font-semibold">{c?.nombre}</h1>
+                <h1 className="font-display text-2xl font-semibold leading-tight sm:text-3xl">{c?.nombre}</h1>
                 <div className="flex flex-wrap items-center gap-2 text-sm text-white/75">
                   <p>
                     {c?.año} · {c?.estado}
@@ -117,7 +117,7 @@ export function CampeonatoLayout() {
                 </div>
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 lg:justify-end">
               <div className="rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white ring-1 ring-white/15">
                 Fixture público
               </div>
@@ -136,40 +136,42 @@ export function CampeonatoLayout() {
         </div>
       </div>
 
-      <div className="sticky top-2 z-10 flex flex-wrap gap-2 rounded-xl border border-primary/10 bg-white/95 p-2 shadow-sm backdrop-blur">
-        <NavLink
-          to={{ pathname: `/campeonatos/${id}`, search: currentSearch ? `?${currentSearch}` : '' }}
-          end
-          className={({ isActive }) =>
-            cn(
-              'rounded-lg px-3 py-2 text-sm font-semibold',
-              isActive ? 'bg-primary text-white' : 'text-primary/70 hover:bg-secondary/5',
-            )
-          }
-        >
-          Resumen
-        </NavLink>
-        {(
-          [
-            ['calendario', 'Calendario'],
-            ['grupos', 'Grupos'],
-            ['fases', 'Fases'],
-            ['partidos', 'Partidos'],
-          ] as const
-        ).map(([path, label]) => (
+      <div className="sticky top-2 z-10 -mx-3 border-y border-primary/10 bg-white/92 px-3 py-2 shadow-sm backdrop-blur sm:mx-0 sm:rounded-xl sm:border sm:px-2">
+        <div className="no-scrollbar flex min-w-max gap-2 overflow-x-auto pb-1">
           <NavLink
-            key={path}
-            to={{ pathname: `/campeonatos/${id}/${path}`, search: currentSearch ? `?${currentSearch}` : '' }}
+            to={{ pathname: `/campeonatos/${id}`, search: currentSearch ? `?${currentSearch}` : '' }}
+            end
             className={({ isActive }) =>
               cn(
-                'rounded-lg px-3 py-2 text-sm font-semibold',
+                'shrink-0 rounded-lg px-3 py-2 text-sm font-semibold',
                 isActive ? 'bg-primary text-white' : 'text-primary/70 hover:bg-secondary/5',
               )
             }
           >
-            {label}
+            Resumen
           </NavLink>
-        ))}
+          {(
+            [
+              ['calendario', 'Calendario'],
+              ['grupos', 'Grupos'],
+              ['fases', 'Fases'],
+              ['partidos', 'Partidos'],
+            ] as const
+          ).map(([path, label]) => (
+            <NavLink
+              key={path}
+              to={{ pathname: `/campeonatos/${id}/${path}`, search: currentSearch ? `?${currentSearch}` : '' }}
+              className={({ isActive }) =>
+                cn(
+                  'shrink-0 rounded-lg px-3 py-2 text-sm font-semibold',
+                  isActive ? 'bg-primary text-white' : 'text-primary/70 hover:bg-secondary/5',
+                )
+              }
+            >
+              {label}
+            </NavLink>
+          ))}
+        </div>
       </div>
 
       <DisciplineFilter disciplinas={disciplinas} categoriasDisponibles={categoriasDisponibles} />

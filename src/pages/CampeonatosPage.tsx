@@ -38,11 +38,11 @@ export function CampeonatosPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="font-display text-3xl font-semibold text-primary">Campeonatos</h1>
+          <h1 className="font-display text-3xl font-semibold text-primary sm:text-4xl">Campeonatos</h1>
           <p className="text-sm text-muted">Listado público sincronizado con Google Sheets.</p>
         </div>
         {isAdmin ? (
-          <Button asChild>
+          <Button asChild className="w-full md:w-auto">
             <Link to="/campeonatos/nuevo">Nuevo campeonato</Link>
           </Button>
         ) : null}
@@ -50,21 +50,21 @@ export function CampeonatosPage() {
 
       <div className="grid gap-4 md:grid-cols-2">
         {(q.data || []).map((c) => (
-          <Card key={c.id} className="hover:shadow-md">
+          <Card key={c.id} className="border-primary/10 bg-white/95 hover:shadow-md">
             <CardHeader>
               <CardTitle className="text-xl">{c.nombre}</CardTitle>
               <CardDescription>
                 {c.año} · {c.estado}
               </CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-wrap gap-2">
-              <Button asChild size="sm">
+            <CardContent className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              <Button asChild size="sm" className="w-full sm:w-auto">
                 <Link to={`/campeonatos/${c.id}`}>Ver</Link>
               </Button>
-              <Button asChild size="sm" variant="outline">
+              <Button asChild size="sm" variant="outline" className="w-full sm:w-auto">
                 <Link to={`/campeonatos/${c.id}/calendario`}>Calendario</Link>
               </Button>
-              <Button asChild size="sm" variant="outline">
+              <Button asChild size="sm" variant="outline" className="w-full sm:w-auto">
                 <Link to={`/campeonatos/${c.id}/partidos`}>Partidos</Link>
               </Button>
             </CardContent>

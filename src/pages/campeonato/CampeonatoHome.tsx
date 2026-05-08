@@ -78,7 +78,7 @@ export function CampeonatoHome() {
               <Badge variant="muted">Fase dominante: {faseActiva}</Badge>
             </div>
             <div className="space-y-2">
-              <CardTitle className="text-3xl text-primary">{c?.nombre}</CardTitle>
+              <CardTitle className="text-2xl text-primary sm:text-3xl">{c?.nombre}</CardTitle>
               <CardDescription className="max-w-2xl text-sm text-muted">
                 {c?.descripcion || 'Este campeonato ya tiene una vista pública estructurada por disciplina, fases y calendario.'}
               </CardDescription>
@@ -88,7 +88,7 @@ export function CampeonatoHome() {
             {kpis.map((item) => (
               <div key={item.label} className="rounded-2xl border border-primary/10 bg-white/90 p-4 shadow-sm">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted">{item.label}</p>
-                <p className={`mt-2 font-score text-4xl font-bold ${item.tone}`}>{item.value}</p>
+                <p className={`mt-2 font-score text-3xl font-bold sm:text-4xl ${item.tone}`}>{item.value}</p>
               </div>
             ))}
           </CardContent>
@@ -100,16 +100,16 @@ export function CampeonatoHome() {
             <CardDescription>Entradas priorizadas según la disciplina seleccionada.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3">
-            <Button asChild>
+            <Button asChild className="w-full justify-center">
               <Link to={{ pathname: `/campeonatos/${campeonatoId}/partidos`, search: location.search }}>Seguir jornada</Link>
             </Button>
-            <Button asChild variant="outline">
+            <Button asChild variant="outline" className="w-full justify-center">
               <Link to={{ pathname: `/campeonatos/${campeonatoId}/calendario`, search: location.search }}>Ver calendario completo</Link>
             </Button>
-            <Button asChild variant="outline">
+            <Button asChild variant="outline" className="w-full justify-center">
               <Link to={{ pathname: `/campeonatos/${campeonatoId}/grupos`, search: location.search }}>Ir a grupos y tablas</Link>
             </Button>
-            <Button asChild variant="outline">
+            <Button asChild variant="outline" className="w-full justify-center">
               <Link to={{ pathname: `/campeonatos/${campeonatoId}/fases`, search: location.search }}>Explorar fases</Link>
             </Button>
           </CardContent>
@@ -134,12 +134,12 @@ export function CampeonatoHome() {
                   <Badge variant={siguiente.estado === 'en_curso' ? 'live' : 'default'}>{siguiente.estado}</Badge>
                 </div>
                 <div className="grid gap-4 md:grid-cols-[1fr_auto_1fr] md:items-center">
-                  <p className="font-display text-2xl font-semibold leading-tight text-primary">{siguiente.localNombre}</p>
+                  <p className="font-display text-xl font-semibold leading-tight text-primary sm:text-2xl">{siguiente.localNombre}</p>
                   <div className="text-center">
                     <p className="font-score text-3xl font-bold text-secondary">{formatPartidoTime(siguiente.hora) || 'VS'}</p>
                     <p className="text-sm text-muted">{formatPartidoDateKey(siguiente.fecha)}</p>
                   </div>
-                  <p className="font-display text-2xl font-semibold leading-tight text-primary md:text-right">{siguiente.visitaNombre}</p>
+                  <p className="font-display text-xl font-semibold leading-tight text-primary sm:text-2xl md:text-right">{siguiente.visitaNombre}</p>
                 </div>
                 <p className="text-sm text-muted">{siguiente.lugar}</p>
               </div>

@@ -75,7 +75,7 @@ export function MatchCard({ partido, onClick, className }: MatchCardProps) {
         className,
       )}
     >
-      <CardContent className="space-y-4 p-4 md:p-5">
+      <CardContent className="space-y-4 p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
             {estadoBadge(String(partido.estado))}
@@ -84,7 +84,7 @@ export function MatchCard({ partido, onClick, className }: MatchCardProps) {
             <Badge variant="muted">{partido.categoria}</Badge>
             {partido.grupo ? <Badge variant="secondary">{partido.grupo}</Badge> : null}
           </div>
-          <div className="rounded-2xl border border-primary/10 bg-primary/5 px-3 py-2 text-right">
+          <div className="rounded-2xl border border-primary/10 bg-primary/5 px-3 py-2 text-left sm:text-right">
             <p className="font-score text-base font-bold text-primary tabular-nums">{hora || '--:--'}</p>
             <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted">{fecha}</p>
           </div>
@@ -93,18 +93,18 @@ export function MatchCard({ partido, onClick, className }: MatchCardProps) {
         <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto_1fr] md:items-center">
           <div className="text-left">
             <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted">Local</p>
-            <p className="font-display text-xl font-semibold leading-tight text-primary md:text-2xl">{partido.localNombre}</p>
+            <p className="font-display text-lg font-semibold leading-tight text-primary sm:text-xl md:text-2xl">{partido.localNombre}</p>
           </div>
 
           <div className="flex flex-col items-center justify-center gap-2">
             {hasScore ? (
-              <div className="font-score flex items-baseline gap-2 rounded-2xl bg-primary/5 px-4 py-2 text-4xl font-bold tabular-nums text-primary md:text-5xl">
+              <div className="font-score flex items-baseline gap-2 rounded-2xl bg-primary/5 px-4 py-2 text-3xl font-bold tabular-nums text-primary sm:text-4xl md:text-5xl">
                 <span>{Number(ml)}</span>
                 <span className="text-2xl text-muted">:</span>
                 <span>{Number(mv)}</span>
               </div>
             ) : (
-              <div className="font-display rounded-full border border-primary/10 bg-primary/5 px-4 py-2 text-2xl font-bold text-primary/70">
+              <div className="font-display rounded-full border border-primary/10 bg-primary/5 px-4 py-2 text-xl font-bold text-primary/70 sm:text-2xl">
                 VS
               </div>
             )}
@@ -113,7 +113,7 @@ export function MatchCard({ partido, onClick, className }: MatchCardProps) {
 
           <div className="text-left md:text-right">
             <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted md:text-right">Visita</p>
-            <p className="font-display text-xl font-semibold leading-tight text-primary md:text-2xl">{partido.visitaNombre}</p>
+            <p className="font-display text-lg font-semibold leading-tight text-primary sm:text-xl md:text-2xl">{partido.visitaNombre}</p>
           </div>
         </div>
 

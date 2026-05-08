@@ -419,20 +419,22 @@ El resultado no se registra de la misma forma para todas las disciplinas. El `Di
 
 ### Vóleibol
 
-- El `Dialog` muestra filas por set en lugar de campos numéricos.
-- Cada fila tiene dos botones toggle: uno por equipo. Al hacer click se selecciona al ganador del set; hacer click de nuevo sobre el seleccionado lo deselecciona.
+- El `Dialog` muestra una fila por set con **dos inputs numéricos**: puntos del local y puntos de la visita.
+- El ganador de cada set se deriva automáticamente comparando los puntajes: quien tenga más puntos gana el set. Si hay empate en puntaje el set queda incompleto.
+- Cada fila muestra un indicador de color (`◀ gana` en verde para local, `gana ▶` en azul para visita).
+- Los encabezados de columna muestran los nombres de ambos equipos alineados sobre sus respectivos inputs.
 - Lógica de sets:
 
-  | Set 1    | Set 2    | ¿Set 3?          |
-  |----------|----------|------------------|
-  | local    | local    | No · Local 2-0   |
-  | visita   | visita   | No · Visita 2-0  |
-  | local    | visita   | Sí (desempate)   |
-  | visita   | local    | Sí (desempate)   |
+  | Set 1  | Set 2  | ¿Set 3?          |
+  |--------|--------|------------------|
+  | local  | local  | No · Local 2-0   |
+  | visita | visita | No · Visita 2-0  |
+  | local  | visita | Sí (desempate)   |
+  | visita | local  | Sí (desempate)   |
 
-- El set 3 solo aparece cuando hay empate 1-1. Debajo de los sets se muestra un texto de estado: `"Empate 1-1 · Se juega set 3"` o el resultado derivado.
-- El botón "Guardar resultado" se habilita cuando todos los sets necesarios tienen ganador.
-- Lo que se persiste en backend son **sets ganados** (ej. `2` y `1`), no scores individuales de cada set.
+- El set 3 (`Set 3 · Des.`) solo aparece cuando hay empate 1-1. El texto de estado debajo cambia entre `"Empate 1-1 — se juega set 3"` (en ámbar) y el resultado final (en verde).
+- El botón "Guardar resultado" se habilita cuando todos los sets necesarios tienen ganador derivado.
+- Lo que se persiste en backend son **sets ganados** (ej. `2` y `1`), no los puntajes individuales de cada set.
 
 ### Otras disciplinas
 
@@ -449,29 +451,39 @@ src/pages/admin/AdminResultadosPage.tsx
 Elementos clave:
 
 ```ts
-type SetWinner = 'local' | 'visita' | null
+interface SetScore { local: string; visita: string }
+const EMPTY_SET: SetScore = { local: '', visita: '' }
 
 function esVoleibol(disciplina: string): boolean
 // detecta por regex /vol[eé]ibol/i — acepta "Vóleibol" y "Voleibol"
 
-function SetRow({ label, winner, localNombre, visitaNombre, onChange })
-// componente de fila de set con dos botones toggle
+function setWinner(score: SetScore): 'local' | 'visita' | null
+// compara puntajes; null si incompleto, NaN o empate
+
+function SetScoreRow({ label, score, onChange })
+// fila con dos inputs numéricos + indicador de ganador derivado
+// grid: [4rem label | 1fr local input | 0.75rem sep | 1fr visita input | 4rem ganador]
 ```
 
 Estado del modal para vóleibol:
 
 ```ts
-const [set1, setSet1] = useState<SetWinner>(null)
-const [set2, setSet2] = useState<SetWinner>(null)
-const [set3, setSet3] = useState<SetWinner>(null)
+const [set1, setSet1] = useState<SetScore>(EMPTY_SET)
+const [set2, setSet2] = useState<SetScore>(EMPTY_SET)
+const [set3, setSet3] = useState<SetScore>(EMPTY_SET)
 
-const needsSet3 = set1 !== null && set2 !== null && set1 !== set2
-const voleiLocal  = (set1==='local'?1:0) + (set2==='local'?1:0) + (needsSet3&&set3==='local'?1:0)
-const voleiVisita = (set1==='visita'?1:0) + (set2==='visita'?1:0) + (needsSet3&&set3==='visita'?1:0)
-const voleiCompleto = set1!==null && set2!==null && (!needsSet3 || set3!==null)
+const winner1 = setWinner(set1)   // 'local' | 'visita' | null
+const winner2 = setWinner(set2)
+const winner3 = setWinner(set3)
+const needsSet3 = winner1 !== null && winner2 !== null && winner1 !== winner2
+const voleiLocal  = (winner1==='local'?1:0) + (winner2==='local'?1:0) + (needsSet3&&winner3==='local'?1:0)
+const voleiVisita = (winner1==='visita'?1:0) + (winner2==='visita'?1:0) + (needsSet3&&winner3==='visita'?1:0)
+const voleiCompleto = winner1!==null && winner2!==null && (!needsSet3 || winner3!==null)
 ```
 
-Los sets se resetean a `null` cada vez que se abre el modal de un nuevo partido.
+Los sets se resetean a `EMPTY_SET` cada vez que se abre el modal de un nuevo partido.
+
+El `DialogContent` tiene `max-h-[90dvh] overflow-y-auto` para evitar desbordamiento con 3 sets visibles.
 
 ---
 

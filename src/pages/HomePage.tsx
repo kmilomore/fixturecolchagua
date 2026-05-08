@@ -71,24 +71,24 @@ export function HomePage() {
   return (
     <div className="space-y-8">
       <section className="overflow-hidden rounded-2xl border border-white/10 bg-[image:var(--gradient-brand)] p-[1px] shadow-sm">
-        <div className="rounded-2xl bg-[image:var(--gradient-brand)] px-6 py-10 text-white">
+        <div className="rounded-2xl bg-[image:var(--gradient-brand)] px-4 py-8 text-white sm:px-6 sm:py-10">
           <div className="flex flex-col gap-6 md:flex-row md:items-center">
-            <div className="grid h-24 w-24 shrink-0 place-items-center rounded-2xl bg-white p-3 shadow-lg">
+            <div className="grid h-20 w-20 shrink-0 place-items-center rounded-2xl bg-white p-3 shadow-lg sm:h-24 sm:w-24">
               <img src="/SLEPCOLCHAGUA.webp" alt="SLEP Colchagua" className="h-full w-full object-contain" />
             </div>
-            <div>
-              <p className="font-display text-3xl font-semibold tracking-wide md:text-4xl">Campeonato Deportivo</p>
+            <div className="min-w-0">
+              <p className="font-display text-2xl font-semibold tracking-wide sm:text-3xl md:text-4xl">Campeonato Deportivo</p>
               <p className="mt-2 max-w-2xl text-sm text-white/80 md:text-base">
                 Encuentra rápidamente tus partidos, revisa el calendario y sigue resultados del campeonato.
               </p>
-              <div className="mt-6 flex flex-wrap gap-3">
-                <Button asChild variant="secondary" className="bg-white text-primary hover:bg-white/90">
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                <Button asChild variant="secondary" className="w-full bg-white text-primary hover:bg-white/90 sm:w-auto">
                   <Link to="/campeonatos">Ver campeonatos</Link>
                 </Button>
-                <Button asChild variant="outline" className="border-white/30 bg-white/5 text-white hover:bg-white/10">
+                <Button asChild variant="outline" className="w-full border-white/30 bg-white/5 text-white hover:bg-white/10 sm:w-auto">
                   <Link to="/mis-partidos">Buscar mis partidos</Link>
                 </Button>
-                <Button asChild variant="outline" className="border-white/30 bg-white/5 text-white hover:bg-white/10">
+                <Button asChild variant="outline" className="w-full border-white/30 bg-white/5 text-white hover:bg-white/10 sm:w-auto">
                   <Link to="/kiosco">Modo kiosco</Link>
                 </Button>
               </div>
@@ -100,7 +100,7 @@ export function HomePage() {
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="border-primary/10">
           <CardHeader>
-            <CardTitle className="text-xl">Buscar mi colegio</CardTitle>
+            <CardTitle className="text-xl sm:text-2xl">Buscar mi colegio</CardTitle>
             <CardDescription>Vista rápida por establecimiento.</CardDescription>
           </CardHeader>
           <CardContent>
@@ -111,7 +111,7 @@ export function HomePage() {
         </Card>
         <Card className="border-primary/10">
           <CardHeader>
-            <CardTitle className="text-xl">Ver fixture completo</CardTitle>
+            <CardTitle className="text-xl sm:text-2xl">Ver fixture completo</CardTitle>
             <CardDescription>Calendario, partidos y grupos.</CardDescription>
           </CardHeader>
           <CardContent>
@@ -122,7 +122,7 @@ export function HomePage() {
         </Card>
         <Card className="border-primary/10">
           <CardHeader>
-            <CardTitle className="text-xl">Pantalla del gimnasio</CardTitle>
+            <CardTitle className="text-xl sm:text-2xl">Pantalla del gimnasio</CardTitle>
             <CardDescription>Modo proyector para jornadas.</CardDescription>
           </CardHeader>
           <CardContent>
@@ -140,21 +140,21 @@ export function HomePage() {
               <CardTitle>Campeonato destacado</CardTitle>
               <CardDescription>Acceso rápido al fixture activo.</CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div>
-                <p className="font-display text-2xl font-semibold text-primary">{destacado.nombre}</p>
+            <CardContent className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="min-w-0">
+                <p className="font-display text-xl font-semibold text-primary sm:text-2xl">{destacado.nombre}</p>
                 <p className="text-sm text-muted">
                   Año {destacado.año} · {destacado.estado}
                 </p>
               </div>
-              <div className="flex flex-wrap gap-2">
-                <Button asChild>
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                <Button asChild className="w-full sm:w-auto">
                   <Link to={`/campeonatos/${destacado.id}`}>Ir al campeonato</Link>
                 </Button>
-                <Button asChild variant="outline">
+                <Button asChild variant="outline" className="w-full sm:w-auto">
                   <Link to={`/campeonatos/${destacado.id}/calendario`}>Calendario</Link>
                 </Button>
-                <Button asChild variant="outline">
+                <Button asChild variant="outline" className="w-full sm:w-auto">
                   <Link to={`/campeonatos/${destacado.id}/grupos`}>Grupos</Link>
                 </Button>
               </div>
@@ -179,14 +179,14 @@ export function HomePage() {
                       <Badge variant="muted">{siguiente.categoria}</Badge>
                     </div>
                     <div className="grid gap-3 md:grid-cols-[1fr_auto_1fr] md:items-center">
-                      <p className="font-display text-2xl font-semibold text-primary">{siguiente.localNombre}</p>
+                      <p className="font-display text-xl font-semibold text-primary sm:text-2xl">{siguiente.localNombre}</p>
                       <div className="text-center">
                         <p className="font-display text-3xl font-bold text-secondary">VS</p>
                         <p className="text-xs font-semibold text-muted">
                           {formatPartidoDateKey(siguiente.fecha)} · {formatPartidoTime(siguiente.hora)}
                         </p>
                       </div>
-                      <p className="font-display text-2xl font-semibold text-primary md:text-right">
+                      <p className="font-display text-xl font-semibold text-primary sm:text-2xl md:text-right">
                         {siguiente.visitaNombre}
                       </p>
                     </div>

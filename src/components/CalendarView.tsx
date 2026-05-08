@@ -64,14 +64,18 @@ export function CalendarView({ partidos, onSelectMatch }: CalendarViewProps) {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between gap-3 rounded-xl border border-primary/10 bg-white p-2 shadow-sm md:hidden">
-        <p className="pl-2 text-sm font-semibold text-primary">Vista móvil</p>
+      <div className="sticky top-[4.75rem] z-[5] flex items-center justify-between gap-3 rounded-xl border border-primary/10 bg-white/95 p-2 shadow-sm backdrop-blur md:hidden">
+        <div className="pl-2">
+          <p className="text-sm font-semibold text-primary">Vista móvil</p>
+          <p className="text-[11px] text-muted">Lista para lectura rápida, mes para visión general.</p>
+        </div>
         <div className="flex gap-2">
-          <Button size="sm" variant={view === 'lista' ? 'default' : 'outline'} onClick={() => setView('lista')}>
+          <Button size="sm" className="min-w-[72px]" variant={view === 'lista' ? 'default' : 'outline'} onClick={() => setView('lista')}>
             Lista
           </Button>
           <Button
             size="sm"
+            className="min-w-[72px]"
             variant={view === 'calendario' ? 'default' : 'outline'}
             onClick={() => setView('calendario')}
           >
@@ -128,7 +132,7 @@ export function CalendarView({ partidos, onSelectMatch }: CalendarViewProps) {
             </div>
 
             <div className="overflow-hidden rounded-card border border-black/10 bg-white shadow-sm">
-              <div className="grid grid-cols-7 bg-primary text-center text-xs font-semibold uppercase tracking-wide text-white">
+              <div className="hidden grid-cols-7 bg-primary text-center text-xs font-semibold uppercase tracking-wide text-white md:grid">
                 {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((day) => (
                   <div key={day} className="px-2 py-3">
                     {day}
@@ -146,14 +150,19 @@ export function CalendarView({ partidos, onSelectMatch }: CalendarViewProps) {
                     <div
                       key={fechaKey}
                       className={[
-                        'min-h-36 border-t border-black/10 p-3 md:border-l md:first:border-l-0',
-                        inMonth ? 'bg-white' : 'hidden bg-surface/60 text-muted md:block',
+                        'min-h-0 border-t border-black/10 p-3 first:border-t-0 md:min-h-36 md:border-l md:first:border-l-0 md:first:border-t',
+                        inMonth
+                          ? 'bg-white'
+                          : 'hidden bg-surface/60 text-muted md:block',
                       ].join(' ')}
                     >
                       <div className="mb-2 flex items-center justify-between">
-                        <span className="font-score text-lg font-bold tabular-nums text-primary">
-                          {format(day, 'd')}
-                        </span>
+                        <div>
+                          <span className="font-score text-lg font-bold tabular-nums text-primary">{format(day, 'd')}</span>
+                          <p className="mt-0.5 text-[11px] font-medium uppercase tracking-[0.14em] text-muted md:hidden">
+                            {format(day, 'EEEE', { locale: es })}
+                          </p>
+                        </div>
                         {lista.length ? <Badge variant="muted">{lista.length}</Badge> : null}
                       </div>
 

@@ -27,10 +27,20 @@ body {
   margin: 0;
   font-family: 'DM Sans', system-ui, sans-serif;
   color: var(--color-text);
-  background: var(--color-surface);
+  background:
+    radial-gradient(circle at top, rgba(0, 107, 185, 0.12), transparent 34%),
+    linear-gradient(180deg, #f7f9fc 0%, #edf0f5 42%, #e8ecf4 100%);
+  overflow-x: hidden;
 }
 
 @layer utilities {
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
   .stagger-children > * {
     animation: fade-up 0.45s ease-out both;
   }
